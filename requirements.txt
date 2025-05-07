@@ -1,0 +1,12 @@
+google-generativeai
+google-adk
+qdrant-client
+fastapi
+uvicorn
+python-dotenv
+python-multipart
+Pillow
+transformers
+torch
+numpy
+pydantic 
