@@ -75,30 +75,62 @@ class HostAgent:
 
     def root_instruction(self, context: ReadonlyContext) -> str:
         current_agent = self.check_state(context)
-        return f"""You are an expert delegator that can delegate the user request to the
-appropriate remote agents.
+        return f"""You are a smart Orchestrator Agent for an eyewear recommendation chatbot system. Your role is to analyze user input (text, images, or both) and coordinate tasks with remote agents to provide accurate and helpful responses. Always respond to the user in Vietnamese, ensuring a friendly and professional tone.
 
-Discovery:
-- You can use `list_remote_agents` to list the available remote agents you
-can use to delegate the task.
+                Analysis:
+                1. Determine the user's intent from their input:
+                - Search: Requests related to finding eyewear products (e.g., "Find glasses for a round face" or uploading an image).
+                - Order: Requests related to purchasing or managing orders (e.g., "Buy rectangular glasses").
+                - FAQ: General questions or inquiries (e.g., "What is your return policy?").
+                2. If the user provides an image:
+                - Check if the image contains a human face.
+                - If a face is detected:
+                    - Identify the skin tone (light, medium, dark).
+                    - Identify the face shape (round, oval, square, heart, diamond, long).
+                    - Suggest 2–3 suitable eyeglass frame shapes (e.g., rectangle, square, cat-eye, round).
+                    - If the person is wearing glasses, describe:
+                    - Frame shape (e.g., square, round).
+                    - Color (e.g., blue, black).
+                    - Style (e.g., minimalist, bold, fashion, sporty).
+                - Generate an analysis result in the following JSON format:
+                    {
+                    "face_detected": <true|false>,
+                    "glasses_detected": <true|false>,
+                    "skin_tone": "<light|medium|dark>",
+                    "face_shape": "<round|oval|square|heart|diamond|long>",
+                    "recommended_frame_shapes": ["<shape1>", "<shape2>", "<shape3>"],
+                    "glasses_observed": {
+                        "frame_shape": "<shape>",
+                        "color": "<color>",
+                        "style": "<minimalist|bold|fashion|sporty>"
+                    },
+                    "summary": "<A concise summary of the analysis, including face shape, skin tone, and frame recommendations>"
+                    }
 
-Execution:
-- For actionable tasks, you can use `create_task` to assign tasks to remote agents to perform.
-Be sure to include the remote agent name when you respond to the user.
+                Discovery:
+                - Use `list_remote_agents` to identify available remote agents (e.g., search_agent, order_management_agent, faq_agent) for task delegation.
 
-You can use `check_pending_task_states` to check the states of the pending
-tasks.
+                Execution:
+                - Based on the user's intent and analysis:
+                - For search intent, delegate to search_agent with relevant details (e.g., "Find rectangle and square glasses for an oval face" or the JSON analysis result).
+                - For order intent, delegate to order_management_agent (e.g., "Create an order for rectangular glasses").
+                - For FAQ intent, delegate to faq_agent (e.g., "Answer a question about return policy").
+                - Use `send_task` to assign tasks to the appropriate remote agent, including necessary information such as text descriptions or JSON analysis results.
+                - Monitor task states using `check_pending_task_states` to track progress and handle responses.
 
-Please rely on tools to address the request, and don't make up the response. If you are not sure, please ask the user for more details.
-Focus on the most recent parts of the conversation primarily.
+                Guidelines:
+                - If the user's intent is unclear, politely ask for clarification in Vietnamese (e.g., "Bạn muốn tìm kính, đặt hàng, hay hỏi thông tin khác?").
+                - Rely on tools and remote agents for accurate responses; do not fabricate information.
+                - Focus on the most recent user input to ensure relevance.
+                - If an active agent is handling a task, send updates to that agent using the appropriate tool.
+                - Summarize and present results to the user in a natural, user-friendly manner in Vietnamese.
 
-If there is an active agent, send the request to that agent with the update task tool.
+                Available Agents:
+                {self.agents}
 
-Agents:
-{self.agents}
-
-Current agent: {current_agent['active_agent']}
-"""
+                Current Active Agent:
+                {current_agent['active_agent']}
+                """
 
     def check_state(self, context: ReadonlyContext):
         state = context.state
@@ -120,6 +152,10 @@ Current agent: {current_agent['active_agent']}
                 state['session_id'] = str(uuid.uuid4())
             state['session_active'] = True
 
+        # Lưu kết quả phân tích ảnh (nếu có) từ lần gọi trước
+        if 'analysis_result' in callback_context.input_data:
+            state['last_analysis_result'] = callback_context.input_data['analysis_result']
+
     def list_remote_agents(self):
         """List the available remote agents you can use to delegate the task."""
         if not self.remote_agent_connections:
@@ -133,83 +169,119 @@ Current agent: {current_agent['active_agent']}
         return remote_agent_info
 
     async def send_task(
-        self, agent_name: str, message: str, tool_context: ToolContext
+        self,
+        agent_name: str,
+        message: str,
+        image_data: Optional[bytes] = None,
+        analysis_result: Optional[dict] = None,
+        tool_context: ToolContext = None,
     ):
-        """Sends a task either streaming (if supported) or non-streaming.
-
-        This will send a message to the remote agent named agent_name.
+        """Sends a task either streaming (if supported) or non-streaming to a remote agent.
 
         Args:
-          agent_name: The name of the agent to send the task to.
-          message: The message to send to the agent for the task.
-          tool_context: The tool context this method runs in.
+            agent_name: The name of the agent to send the task to.
+            message: The message to send to the agent for the task.
+            image_data: Optional image bytes to send (if the agent needs to process the image).
+            analysis_result: Optional JSON result from image analysis (if already processed by Orchestrator).
+            tool_context: The tool context this method runs in.
 
-        Yields:
-          A dictionary of JSON data.
+        Returns:
+            A list of processed response parts, formatted for user-friendly output in Vietnamese.
         """
         if agent_name not in self.remote_agent_connections:
             raise ValueError(f'Agent {agent_name} not found')
         state = tool_context.state
         state['agent'] = agent_name
-        card = self.cards[agent_name]
         client = self.remote_agent_connections[agent_name]
-        if not client:
-            raise ValueError(f'Client not available for {agent_name}')
-        if 'task_id' in state:
-            taskId = state['task_id']
-        else:
-            taskId = str(uuid.uuid4())
+        taskId = state.get('task_id', str(uuid.uuid4()))
         sessionId = state['session_id']
-        task: Task
-        messageId = ''
-        metadata = {}
-        if 'input_message_metadata' in state:
-            metadata.update(**state['input_message_metadata'])
-            if 'message_id' in state['input_message_metadata']:
-                messageId = state['input_message_metadata']['message_id']
-        if not messageId:
-            messageId = str(uuid.uuid4())
-        metadata.update(conversation_id=sessionId, message_id=messageId)
-        request: TaskSendParams = TaskSendParams(
+
+        # Prepare message parts
+        parts = [TextPart(text=message)]
+        if image_data:
+            parts.append(
+                FilePart(
+                    file=types.File(
+                        name="user_image.jpg",
+                        mimeType="image/jpeg",
+                        bytes=base64.b64encode(image_data).decode('utf-8')
+                    )
+                )
+            )
+        if analysis_result:
+            parts.append(DataPart(data=analysis_result))
+
+        # Create task request
+        metadata = {'conversation_id': sessionId, 'message_id': str(uuid.uuid4())}
+        request = TaskSendParams(
             id=taskId,
             sessionId=sessionId,
             message=Message(
                 role='user',
-                parts=[TextPart(text=message)],
+                parts=parts,
                 metadata=metadata,
             ),
-            acceptedOutputModes=['text', 'text/plain', 'image/png'],
-            # pushNotification=None,
+            acceptedOutputModes=['text', 'text/plain', 'image/png', 'application/json'],
             metadata={'conversation_id': sessionId},
         )
+
+        # Send task and handle streaming
         task = await client.send_task(request, self.task_callback)
-        # Assume completion unless a state returns that isn't complete
         state['session_active'] = task.status.state not in [
             TaskState.COMPLETED,
             TaskState.CANCELED,
             TaskState.FAILED,
             TaskState.UNKNOWN,
         ]
+
+        # Handle task status
         if task.status.state == TaskState.INPUT_REQUIRED:
-            # Force user input back
             tool_context.actions.skip_summarization = True
             tool_context.actions.escalate = True
+            return ["Vui lòng cung cấp thêm thông tin để tiếp tục."]
         elif task.status.state == TaskState.CANCELED:
-            # Open question, should we return some info for cancellation instead
-            raise ValueError(f'Agent {agent_name} task {task.id} is cancelled')
+            raise ValueError(f'Nhiệm vụ của agent {agent_name} đã bị hủy.')
         elif task.status.state == TaskState.FAILED:
-            # Raise error for failure
-            raise ValueError(f'Agent {agent_name} task {task.id} failed')
+            raise ValueError(f'Nhiệm vụ của agent {agent_name} thất bại.')
+
+        # Process response
         response = []
         if task.status.message:
-            # Assume the information is in the task message.
-            response.extend(
-                convert_parts(task.status.message.parts, tool_context)
-            )
+            response.extend(convert_parts(task.status.message.parts, tool_context))
         if task.artifacts:
             for artifact in task.artifacts:
                 response.extend(convert_parts(artifact.parts, tool_context))
-        return response
+
+        # Format response in Vietnamese
+        formatted_response = self._format_response(response, agent_name, analysis_result)
+        return formatted_response
+
+    def _format_response(self, response: list, agent_name: str, analysis_result: Optional[dict]) -> list:
+        """Formats the response in Vietnamese based on the agent and analysis result."""
+        formatted = []
+        for item in response:
+            if isinstance(item, dict) and agent_name == "search_agent":
+                # Handle search_agent response (e.g., product list)
+                summary = item.get('summary', '')
+                formatted.append(f"Dựa trên yêu cầu của bạn, đây là gợi ý: {summary}")
+            elif isinstance(item, dict) and agent_name == "order_management_agent":
+                # Handle order_management_agent response
+                formatted.append(f"Đơn hàng của bạn đã được xử lý: {item.get('order_details', '')}")
+            elif isinstance(item, dict) and agent_name == "faq_agent":
+                # Handle faq_agent response
+                formatted.append(f"Câu trả lời cho câu hỏi của bạn: {item.get('answer', '')}")
+            elif isinstance(item, str):
+                # Handle text response
+                formatted.append(item)
+            else:
+                formatted.append("Kết quả không rõ, vui lòng thử lại.")
+        
+        # If there's an analysis result, prepend it
+        if analysis_result:
+            summary = analysis_result.get('summary', '')
+            formatted.insert(0, f"Kết quả phân tích ảnh: {summary}")
+        
+        return formatted
 
 
 def convert_parts(parts: list[Part], tool_context: ToolContext):
@@ -238,4 +310,5 @@ def convert_part(part: Part, tool_context: ToolContext):
         tool_context.actions.skip_summarization = True
         tool_context.actions.escalate = True
         return DataPart(data={'artifact-file-id': file_id})
+
     return f'Unknown type: {part.type}'
