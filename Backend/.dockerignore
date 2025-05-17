@@ -1,0 +1,53 @@
+# Các file hệ thống
+.git
+.gitignore
+.github
+.DS_Store
+*.log
+
+# Môi trường và thư mục ảo
+.env
+.venv
+venv/
+ENV/
+env/
+.python-version
+
+# Thư mục cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Các file Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Các thư mục dữ liệu cục bộ
+data/
+uploads/
+downloads/
+temp/
+
+# Thư mục IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Tài liệu và các file Markdown
+*.md
+!README.md
+
+# Các file khác không cần thiết
+*.bak
+*.tmp
+*.orig 

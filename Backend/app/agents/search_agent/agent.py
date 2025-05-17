@@ -33,6 +33,7 @@ class SearchAgent:
         """
         # Lấy API key từ biến môi trường nếu không được cung cấp
         self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
+        print("api_key: ", api_key)
         self.streaming = streaming
         
         # Khởi tạo search chain

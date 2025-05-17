@@ -1,0 +1,1 @@
+docker run --gpus all -it --name multi-agent -v $(pwd)/app:/app/app -w /app --env-file .env -p 8000:8000 -p 8001:8001 multi-agent bash

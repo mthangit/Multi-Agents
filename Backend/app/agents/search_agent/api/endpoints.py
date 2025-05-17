@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from common.types import (
+from app.common.types import (
     Task, 
     TaskState, 
     TaskSendParams, 

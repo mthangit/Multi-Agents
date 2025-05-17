@@ -1,4 +1,4 @@
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, TypedDict
 import json
 import base64
 
@@ -33,7 +33,7 @@ class SearchChain:
         """
         # Khởi tạo LLM
         self.llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-pro",
+            model="gemini-2.0-flash",
             google_api_key=api_key,
             temperature=0.2,
             streaming=streaming
@@ -62,6 +62,9 @@ class SearchChain:
                 prompt = get_search_prompt_with_analysis(analysis_result)
             else:
                 prompt = SEARCH_AGENT_PROMPT
+            
+            # Thêm biến agent_scratchpad vào prompt
+            prompt += "\n\n{agent_scratchpad}"
             
             # Tạo agent executor
             prompt_template = ChatPromptTemplate.from_template(prompt)
@@ -117,7 +120,16 @@ class SearchChain:
             return state
         
         # Tạo workflow
-        workflow = StateGraph(state_type=Dict)
+        class SearchState(TypedDict, total=False):
+            query: Optional[str]
+            image_data: Optional[str]
+            analysis_result: Optional[dict]
+            agent_result: dict
+            search_results: dict
+            final_response: dict
+            callbacks: list
+
+        workflow = StateGraph(state_schema=SearchState)
         
         # Thêm các node
         workflow.add_node("analyze_request", analyze_request)

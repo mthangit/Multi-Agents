@@ -1,6 +1,7 @@
 import torch
 import logging
 import requests
+import os
 from typing import List, Dict, Optional, Union, Any, Generator
 from PIL import Image
 from io import BytesIO
@@ -25,7 +26,8 @@ class ProductSearch:
         qdrant_port=6333,
         model_name="openai/clip-vit-base-patch32",
         default_limit=5,
-        cache_size=100
+        cache_size=100,
+        custom_model_path=None
     ):
         """Khởi tạo ProductSearch.
 
@@ -35,13 +37,52 @@ class ProductSearch:
             model_name: Tên model CLIP sử dụng
             default_limit: Số lượng kết quả mặc định trả về
             cache_size: Kích thước cache cho các phương thức tìm kiếm
+            custom_model_path: Đường dẫn đến mô hình tùy chỉnh (nếu có)
         """
-        # Khởi tạo CLIP model và processor
-        self.model = CLIPModel.from_pretrained(model_name)
-        self.processor = CLIPProcessor.from_pretrained(model_name)
+        try:
+            # Khởi tạo model và processor mặc định
+            logger.info(f"Đang tải model mặc định {model_name}")
+            self.model = CLIPModel.from_pretrained(model_name)
+            
+            # Nếu có đường dẫn mô hình tùy chỉnh, thử tải
+            if custom_model_path and os.path.exists(custom_model_path):
+                logger.info(f"Đang tải mô hình tùy chỉnh từ {custom_model_path}")
+                try:
+                    # Tải mô hình từ file .pt với map_location để chuyển sang CPU
+                    checkpoint = torch.load(custom_model_path, map_location=torch.device('cpu'))
+                    
+                    # Kiểm tra xem có phải checkpoint từ quá trình fine-tuning không
+                    if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
+                        logger.info("Phát hiện checkpoint từ quá trình fine-tuning")
+                        # Chỉ lấy model_state_dict từ checkpoint
+                        self.model.load_state_dict(checkpoint['model_state_dict'])
+                        logger.info("Đã tải thành công model_state_dict từ checkpoint")
+                    elif isinstance(checkpoint, dict):
+                        # Thử tải trực tiếp nếu có vẻ như là state_dict thuần túy
+                        logger.info("Thử tải state_dict trực tiếp")
+                        self.model.load_state_dict(checkpoint)
+                        logger.info("Đã tải thành công state_dict")
+                    else:
+                        logger.warning(f"Không hỗ trợ định dạng mô hình {type(checkpoint)}")
+                except Exception as e:
+                    logger.error(f"Lỗi khi tải mô hình tùy chỉnh: {e}")
+                    logger.warning("Tiếp tục sử dụng mô hình mặc định")
+            
+            # Tải processor
+            try:
+                self.processor = CLIPProcessor.from_pretrained(model_name)
+                logger.info("Đã tải processor thành công")
+            except ImportError:
+                logger.warning("Torchvision không khả dụng, sử dụng processor chậm")
+                self.processor = CLIPProcessor.from_pretrained(model_name, use_fast=False)
+                
+        except Exception as e:
+            logger.error(f"Lỗi khi tải model: {e}")
+            raise
 
         # Khởi tạo Qdrant client
         self.qdrant_client = QdrantClient(qdrant_host, port=qdrant_port)
+        logger.info(f"Đã kết nối đến Qdrant tại {qdrant_host}:{qdrant_port}")
 
         # Số lượng kết quả trả về mặc định
         self.default_limit = default_limit
