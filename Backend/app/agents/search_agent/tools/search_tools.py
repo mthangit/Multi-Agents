@@ -1,19 +1,34 @@
 import io
 import os
+import torch
 from typing import List, Dict, Optional, Union
 from PIL import Image
 
 from langchain.tools import tool
-from langchain.pydantic_v1 import BaseModel, Field
+from pydantic import BaseModel, Field
 
 from ..search_service import ProductSearch
 from ..models.product import ImageAnalysisResult
 
 
-# Khởi tạo đối tượng ProductSearch (singleton)
+# Đường dẫn đến mô hình fine-tuned (có thể đưa vào biến môi trường)
+custom_model_path = os.environ.get(
+    "CLIP_MODEL_PATH", 
+    os.path.join(os.path.dirname(__file__), "../models/clip/CLIP_FTMT.pt")
+)
+
+# Báo cáo thông tin về mô hình tùy chỉnh
+if os.path.exists(custom_model_path):
+    print(f"Đã tìm thấy mô hình tùy chỉnh tại: {custom_model_path}")
+else:
+    print(f"Không tìm thấy mô hình tùy chỉnh tại: {custom_model_path}")
+    print(f"Sẽ sử dụng mô hình mặc định")
+
+# Khởi tạo đối tượng ProductSearch với mô hình tùy chỉnh
 product_search = ProductSearch(
     qdrant_host=os.environ.get("QDRANT_HOST", "localhost"),
-    qdrant_port=int(os.environ.get("QDRANT_PORT", "6333"))
+    qdrant_port=int(os.environ.get("QDRANT_PORT", "6333")),
+    custom_model_path=custom_model_path if os.path.exists(custom_model_path) else None
 )
 
 

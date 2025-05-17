@@ -1,4 +1,4 @@
-from common.types import (
+from app.common.types import (
     AgentCard,
     AgentCapabilities,
     AgentProvider,
