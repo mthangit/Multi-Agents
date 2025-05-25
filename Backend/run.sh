@@ -1,0 +1,1 @@
+python -m app.agents.search_agent.run_server --host 0.0.0.0 --port 8001 --reload
