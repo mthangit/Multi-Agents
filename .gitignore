@@ -1,1 +1,4 @@
 /agents
+.env
+__pycache__
+*.pt

@@ -61,7 +61,7 @@ def main():
     
     # Khởi động server
     uvicorn.run(
-        "api.endpoints:app", 
+        "app.agents.search_agent.api.endpoints:app", 
         host=args.host,
         port=args.port,
         reload=args.reload,
