@@ -1,0 +1,19 @@
+{
+  "message": "thêm sản phẩm vào giỏ hàng giúp tôi đi",
+  "intent": "add_to_cart",
+  "parameters": {
+    "product_id": null,
+    "quantity": null
+  },
+  "product": null,
+  "products": null,
+  "order_id": null,
+  "order": null,
+  "error": "Không tìm thấy ID sản phẩm",
+  "cart_items": null,
+  "conversation_stage": null,
+  "collected_info": {},
+  "pending_questions": [],
+  "user_session_id": "cli_session_20250525_000803",
+  "response": "Chào bạn!\n\nRất tiếc, hiện tại mình không tìm thấy ID sản phẩm bạn muốn thêm vào giỏ hàng. Bạn có thể vui lòng cung cấp ID sản phẩm chính xác để mình hỗ trợ bạn thêm vào giỏ hàng được không ạ?\n\nHoặc, bạn có thể cho mình biết tên sản phẩm bạn muốn tìm, mình sẽ giúp bạn tìm kiếm nhé!\n\nCảm ơn bạn!"
+}

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Streaming Chatbot Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .chat-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 80vh;
+        }
+        
+        .chat-header {
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-bottom: 20px;
+            padding: 10px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+        }
+        
+        .user-message {
+            justify-content: flex-end;
+        }
+        
+        .bot-message {
+            justify-content: flex-start;
+        }
+        
+        .message-content {
+            padding: 10px 15px;
+            border-radius: 20px;
+            max-width: 70%;
+        }
+        
+        .user-message .message-content {
+            background-color: #007bff;
+            color: white;
+        }
+        
+        .bot-message .message-content {
+            background-color: #f1f0f0;
+            color: black;
+        }
+        
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .chat-input input {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        
+        .chat-input button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        
+        .chat-input button:hover {
+            background-color: #0056b3;
+        }
+        
+        .typing-indicator {
+            display: inline-block;
+            padding-left: 10px;
+        }
+        
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #888;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: typing 1s infinite;
+        }
+        
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        @keyframes typing {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 10px;
+        }
+        
+        .toggle-streaming {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .toggle-streaming input {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Order Management Chatbot</h1>
+            <p>Ask about products, place orders, or check order status</p>
+        </div>
+        
+        <div class="chat-messages" id="chat-messages">
+            <div class="message bot-message">
+                <div class="message-content">
+                    Xin chào! Tôi là trợ lý ảo của hệ thống quản lý đơn hàng. Tôi có thể giúp bạn tìm sản phẩm, thêm vào giỏ hàng, đặt hàng hoặc kiểm tra trạng thái đơn hàng. Bạn cần giúp gì?
+                </div>
+            </div>
+        </div>
+        
+        <div class="chat-input">
+            <input type="text" id="user-input" placeholder="Nhập tin nhắn của bạn..." />
+            <button id="send-button">Gửi</button>
+        </div>
+        
+        <div class="controls">
+            <div class="toggle-streaming">
+                <input type="checkbox" id="streaming-toggle" checked />
+                <label for="streaming-toggle">Bật streaming</label>
+            </div>
+            <button id="clear-button">Xóa cuộc trò chuyện</button>
+        </div>
+    </div>
+
+    <script>
+        // DOM elements
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendButton = document.getElementById('send-button');
+        const clearButton = document.getElementById('clear-button');
+        const streamingToggle = document.getElementById('streaming-toggle');
+        
+        // Session ID
+        let sessionId = null;
+        
+        // Current bot message being streamed
+        let currentBotMessage = null;
+        let currentBotMessageElement = null;
+        
+        // Function to add user message
+        function addUserMessage(message) {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message user-message';
+            messageElement.innerHTML = `
+                <div class="message-content">${message}</div>
+            `;
+            chatMessages.appendChild(messageElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Function to add bot message
+        function addBotMessage(message, isStreaming = false) {
+            if (isStreaming && currentBotMessageElement) {
+                // Update existing message for streaming
+                currentBotMessageElement.innerHTML = message;
+            } else {
+                // Create new message element
+                const messageElement = document.createElement('div');
+                messageElement.className = 'message bot-message';
+                messageElement.innerHTML = `
+                    <div class="message-content">${message}</div>
+                `;
+                chatMessages.appendChild(messageElement);
+                
+                // Store reference if streaming
+                if (isStreaming) {
+                    currentBotMessage = message;
+                    currentBotMessageElement = messageElement.querySelector('.message-content');
+                }
+            }
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+        
+        // Function to add typing indicator
+        function addTypingIndicator() {
+            const typingElement = document.createElement('div');
+            typingElement.className = 'message bot-message typing';
+            typingElement.innerHTML = `
+                <div class="message-content">
+                    <div class="typing-indicator">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(typingElement);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            return typingElement;
+        }
+        
+        // Function to remove typing indicator
+        function removeTypingIndicator() {
+            const typingElements = document.querySelectorAll('.typing');
+            typingElements.forEach(element => element.remove());
+        }
+        
+        // Function to send message
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+            
+            // Add user message to chat
+            addUserMessage(message);
+            
+            // Clear input
+            userInput.value = '';
+            
+            // Show typing indicator
+            const typingIndicator = addTypingIndicator();
+            
+            try {
+                // Check if streaming is enabled
+                const isStreaming = streamingToggle.checked;
+                
+                if (isStreaming) {
+                    // Use streaming API
+                    await streamingChat(message);
+                } else {
+                    // Use regular API
+                    await regularChat(message);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                addBotMessage('Xin lỗi, có lỗi xảy ra khi xử lý tin nhắn của bạn.');
+            } finally {
+                // Remove typing indicator
+                removeTypingIndicator();
+            }
+        }
+        
+        // Function for regular chat
+        async function regularChat(message) {
+            const response = await fetch('/chatbot/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    session_id: sessionId,
+                    stream: false
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            
+            const data = await response.json();
+            
+            // Update session ID
+            sessionId = data.session_id;
+            
+            // Add bot message
+            addBotMessage(data.response);
+        }
+        
+        // Function for streaming chat
+        async function streamingChat(message) {
+            // Create a new bot message container for streaming
+            addBotMessage('', true);
+            
+            // Prepare the EventSource URL
+            const eventSource = new EventSource(`/chatbot/chat?session_id=${sessionId || ''}&message=${encodeURIComponent(message)}&stream=true`);
+            
+            // Accumulated response
+            let accumulatedResponse = '';
+            
+            // Handle incoming messages
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.done) {
+                    // Close the connection when done
+                    eventSource.close();
+                } else {
+                    // Append chunk to accumulated response
+                    accumulatedResponse += data.chunk;
+                    
+                    // Update the bot message
+                    addBotMessage(accumulatedResponse, true);
+                }
+                
+                // Update session ID
+                sessionId = data.session_id;
+            };
+            
+            // Handle errors
+            eventSource.onerror = (error) => {
+                console.error('EventSource error:', error);
+                eventSource.close();
+                
+                // If we have no accumulated response, show error
+                if (!accumulatedResponse) {
+                    addBotMessage('Xin lỗi, có lỗi xảy ra khi xử lý tin nhắn của bạn.');
+                }
+            };
+            
+            // Return a promise that resolves when the connection is closed
+            return new Promise((resolve) => {
+                eventSource.addEventListener('done', () => {
+                    eventSource.close();
+                    resolve();
+                });
+                
+                // Also resolve on error
+                eventSource.onerror = () => {
+                    eventSource.close();
+                    resolve();
+                };
+            });
+        }
+        
+        // Function to clear chat
+        function clearChat() {
+            // Keep only the first bot welcome message
+            const welcomeMessage = chatMessages.querySelector('.message');
+            chatMessages.innerHTML = '';
+            if (welcomeMessage) {
+                chatMessages.appendChild(welcomeMessage);
+            }
+            
+            // Reset session ID
+            sessionId = null;
+            
+            // Reset streaming variables
+            currentBotMessage = null;
+            currentBotMessageElement = null;
+        }
+        
+        // Event listeners
+        sendButton.addEventListener('click', sendMessage);
+        
+        userInput.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        
+        clearButton.addEventListener('click', clearChat);
+    </script>
+</body>
+</html> 

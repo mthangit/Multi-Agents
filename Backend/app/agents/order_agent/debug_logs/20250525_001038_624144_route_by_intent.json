@@ -1,0 +1,16 @@
+{
+  "message": "thêm sản phẩm có id 1045771044 vào giỏ hàng giúp tôi nhé",
+  "intent": "add_to_cart",
+  "parameters": null,
+  "product": null,
+  "products": null,
+  "order_id": null,
+  "order": null,
+  "error": null,
+  "cart_items": null,
+  "conversation_stage": null,
+  "collected_info": {},
+  "pending_questions": [],
+  "user_session_id": "cli_session_20250525_000803",
+  "response": null
+}

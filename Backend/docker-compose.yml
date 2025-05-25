@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: mysql_server
+    restart: always               # Đảm bảo container tự động khởi động lại khi bị lỗi hoặc khi Docker khởi động lại
+    environment:
+      MYSQL_ROOT_PASSWORD: 1       # Mật khẩu cho user root của MySQL
+      MYSQL_DATABASE: my_database  # Tên cơ sở dữ liệu mặc định khi container khởi động
+      MYSQL_USER: my_user          # Tạo người dùng MySQL
+      MYSQL_PASSWORD: my_password  # Mật khẩu cho người dùng đó
+    ports:
+      - "3306:3306"                # Map cổng 3306 của container ra ngoài để có thể truy cập MySQL từ máy chủ
+    volumes:
+      - mysql_data:/var/lib/mysql  # Lưu trữ dữ liệu MySQL vào volume ngoài container, giúp bảo toàn dữ liệu
+    networks:
+      - mysql_network              # Mạng riêng cho dịch vụ MySQL (nếu bạn có nhiều dịch vụ cần kết nối vào MySQL)
+
   api:
     build:
       context: .
@@ -37,3 +53,10 @@ services:
 volumes:
   qdrant_data:
     driver: local 
+  
+  mysql_data:                     # Volume lưu trữ dữ liệu
+    driver: local
+
+networks:
+  mysql_network:                  # Tạo mạng riêng để kết nối giữa các dịch vụ
+    driver: bridge
