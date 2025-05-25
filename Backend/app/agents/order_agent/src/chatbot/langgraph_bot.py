@@ -40,6 +40,12 @@ from src.chatbot.nodes.conversation_node import (
     check_conversation_stage_node,
     generate_question_node
 )
+from src.chatbot.nodes.memory_node import (
+    load_session_node,
+    update_memory_node,
+    save_session_node,
+    provide_context_node
+)
 from src.chatbot.state import ChatState, initial_state
 
 # Khởi tạo LLM Gemini từ settings
@@ -89,7 +95,7 @@ def debug_state(state, node_name):
     logger.info(f"Current conversation stage: {state.get('conversation_stage')}")
     
     # Save state to file for debugging
-    save_debug_state(state, node_name)
+    # save_debug_state(state, node_name)
     
     return state
 
@@ -206,6 +212,12 @@ class ChatbotGraph:
         self.graph = StateGraph(ChatState)
         
         # Thêm các node
+        # - Memory nodes
+        self.graph.add_node("load_session", load_session_node)
+        self.graph.add_node("provide_context", provide_context_node)
+        self.graph.add_node("update_memory", update_memory_node)
+        self.graph.add_node("save_session", save_session_node)
+        
         # - Basic nodes
         self.graph.add_node("welcome", welcome_node)
         self.graph.add_node("help", help_node)
@@ -234,10 +246,14 @@ class ChatbotGraph:
         self.graph.add_node("create_order", create_order_node)
         self.graph.add_node("get_order_by_id", get_order_by_id_node)
 
-        # Thiết lập entry point
-        self.graph.set_entry_point("check_conversation_stage")
+        # Thiết lập entry point với memory
+        self.graph.set_entry_point("load_session")
 
         # Thiết lập edges và conditional routing
+        # - Memory flow
+        self.graph.add_edge("load_session", "provide_context")
+        self.graph.add_edge("provide_context", "check_conversation_stage")
+        
         # - Main flow
         self.graph.add_edge("check_conversation_stage", "intent_classification")
         self.graph.add_conditional_edges("intent_classification", route_by_intent)
@@ -249,76 +265,85 @@ class ChatbotGraph:
         # - Collection flow
         self.graph.add_edge("collect_order_info", "generate_question")
         
-        # - Routing to generate_response
+        # - Routing to update_memory and then generate_response
         tools = ["find_product_by_id", "find_product_by_name", "add_to_cart", 
                 "view_cart", "clear_cart", "start_order_process", 
                 "get_order_by_id", "create_order"]
                 
         for tool in tools:
-            self.graph.add_edge(tool, "generate_response")
+            self.graph.add_edge(tool, "update_memory")
             
-        self.graph.add_edge("welcome", "generate_response")
-        self.graph.add_edge("help", "generate_response")
-        self.graph.add_edge("unknown", "generate_response")
-        self.graph.add_edge("generate_question", "generate_response")
+        self.graph.add_edge("welcome", "update_memory")
+        self.graph.add_edge("help", "update_memory")
+        self.graph.add_edge("unknown", "update_memory")
+        self.graph.add_edge("generate_question", "update_memory")
+        
+        # - From update_memory to generate_response and then save_session
+        self.graph.add_edge("update_memory", "generate_response")
+        self.graph.add_edge("generate_response", "save_session")
 
         # Compile graph
         self.app = self.graph.compile()
 
     def process_message(self, message: str, session_id: str = None) -> str:
-        """Process user message and return response"""
+        """Process user message and return response with memory"""
+        import uuid
+        
+        # Generate session ID if not provided
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            
         # Create initial state with user message
         state = initial_state()
         state["message"] = message
         state["user_session_id"] = session_id
-        
-        logger.info(f"Processing message: {message}")
-        logger.info(f"Session ID: {session_id}")
-        
+                
         # Save initial state
-        save_debug_state(state, "initial_state")
+        # save_debug_state(state, "initial_state")
         
-        # Run the graph
+        # Run the graph với memory support
         result = self.app.invoke(state)
-        
-        # Log final state
-        logger.info(f"Final state: intent={result.get('intent')}, response={result.get('response')}")
-        
+                
         # Save final state
-        save_debug_state(result, "final_state")
+        # save_debug_state(result, "final_state")
         
         # Return the response
         return result["response"]
         
     async def process_message_streaming(self, message: str, session_id: str = None) -> AsyncIterator[str]:
-        """Process user message và trả về response theo kiểu streaming thực sự"""
-        logger.info(f"Processing streaming message: {message}")
+        """Process user message và trả về response theo kiểu streaming với memory"""
+        import uuid
+        
+        # Generate session ID if not provided
+        if not session_id:
+            session_id = str(uuid.uuid4())
         
         # Create initial state with user message
         state = initial_state()
         state["message"] = message
         state["user_session_id"] = session_id
         
-        logger.info(f"Session ID: {session_id}")
-        save_debug_state(state, "initial_state_streaming")
-        
-        # Yield initial processing message
-        yield "Đang xử lý"
-        await asyncio.sleep(0.1)
-        yield "..."
+        # save_debug_state(state, "initial_state_streaming")
         await asyncio.sleep(0.1)
         
         try:
-            # Run the graph
+            # Run the graph với memory
             result = self.app.invoke(state)
             
             # Log final state
-            logger.info(f"Final streaming state: intent={result.get('intent')}, response={result.get('response')}")
-            save_debug_state(result, "final_state_streaming")
+            # save_debug_state(result, "final_state_streaming")
             
             response = result.get("response", "Xin lỗi, tôi không thể xử lý yêu cầu này.")
             
-            # Clear the processing message
+            # Clear the processing message and show typing indicator
+            await asyncio.sleep(0.1)
+            yield "."
+            await asyncio.sleep(0.1)
+            yield "."
+            await asyncio.sleep(0.1)
+            yield "."
+            await asyncio.sleep(0.1)
+            
             yield "\r🤖 Bot: "
             await asyncio.sleep(0.05)
             
@@ -333,4 +358,4 @@ class ChatbotGraph:
                 
         except Exception as e:
             logger.error(f"Error in streaming processing: {str(e)}")
-            yield "\r🤖 Bot: Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu của bạn."
+            yield "\r❌ Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu của bạn."

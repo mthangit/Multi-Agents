@@ -26,9 +26,7 @@ def process_llm_json_output(text, intent, message):
         
     Returns:
         dict: Dictionary chứa các parameters đã trích xuất
-    """
-    logger.debug(f"Processing raw JSON output: {text}")
-    
+    """    
     # 1. Tạo default parameters dựa trên intent
     default_params = {}
     if intent == "view_cart" or intent == "clear_cart" or intent == "start_order":
@@ -166,16 +164,22 @@ def extract_product_name_from_message(message):
 
 
 def intent_classification_node(state):
-    """Node phân tích và xác định intent từ message của user"""
+    """Node phân tích và xác định intent từ message của user với context"""
     message = state["message"]
-    logger.info(f"Intent classification for message: '{message}'")
+    context_summary = state.get("context_summary", "")
     
-    # Format prompt với message
-    prompt = INTENT_CLASSIFICATION_PROMPT.format(message=message)
-    logger.debug(f"Intent classification prompt: {prompt}")
+    # Enhanced prompt với context
+    enhanced_prompt = f"""
+{INTENT_CLASSIFICATION_PROMPT.format(message=message)}
+
+## Context từ cuộc trò chuyện:
+{context_summary}
+
+Xem xét context trên để hiểu rõ hơn ý định của user.
+"""
     
     # Gọi LLM để nhận intent
-    intent = llm.invoke(prompt).content.strip().lower()
+    intent = llm.invoke(enhanced_prompt).content.strip().lower()
     logger.info(f"Classified intent: '{intent}'")
     
     # Cập nhật state với intent
@@ -189,11 +193,9 @@ def parameter_extraction_node(state):
     
     # Format prompt với message và intent
     prompt = PARAMETER_EXTRACTION_PROMPT.format(message=message, intent=intent)
-    logger.debug(f"Parameter extraction prompt: {prompt}")
     
     # Gọi LLM để trích xuất tham số
     result = llm.invoke(prompt).content
-    logger.debug(f"Raw parameter extraction result: {result}")
     
     # Xử lý kết quả bằng hàm chuyên biệt
     parameters = process_llm_json_output(result, intent, message)
@@ -202,9 +204,10 @@ def parameter_extraction_node(state):
     return {"parameters": parameters}
 
 def generate_response_node(state):
-    """Node tạo câu trả lời cuối cùng từ kết quả xử lý"""
+    """Node tạo câu trả lời cuối cùng từ kết quả xử lý với context"""
     message = state["message"]
     intent = state["intent"]
+    context_summary = state.get("context_summary", "")
     logger.info(f"Generating response for intent: '{intent}'")
     
     # Tạo result dict từ các trường dữ liệu trong state
@@ -218,20 +221,19 @@ def generate_response_node(state):
     if state.get("order"):
         result["order"] = state["order"]
     if state.get("error"):
-        result["error"] = state["error"]
-    
-    logger.debug(f"Response generation with result data: {result}")
-    
-    # Format prompt với message, intent và result
-    prompt = RESPONSE_GENERATION_PROMPT.format(
-        message=message,
-        intent=intent,
-        result=result
-    )
+        result["error"] = state["error"]    
+    # Enhanced prompt với context
+    enhanced_prompt = f"""
+{RESPONSE_GENERATION_PROMPT.format(message=message, intent=intent, result=result)}
+
+## Context từ cuộc trò chuyện:
+{context_summary}
+
+Hãy tạo phản hồi tự nhiên dựa trên context và kết quả xử lý. Nếu có liên quan đến cuộc trò chuyện trước đó, hãy tham chiếu một cách tự nhiên mà không lặp lại nội dung cũng như câu hỏi của user.
+"""
     
     # Gọi LLM để tạo câu trả lời
-    response = llm.invoke(prompt).content
-    logger.info(f"Generated response: '{response[:50]}...'")
+    response = llm.invoke(enhanced_prompt).content
     
     # Cập nhật state với response
     return {"response": response} 

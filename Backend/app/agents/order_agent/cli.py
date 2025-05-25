@@ -105,8 +105,6 @@ class ChatCLI:
     async def chat_with_streaming(self, message: str):
         """Chat với bot sử dụng streaming response"""
         try:
-            print(f"\n👤 Bạn: {message}")
-            
             # Sử dụng streaming version nếu có
             if hasattr(self.chatbot, 'process_message_streaming'):
                 bot_label_printed = False
@@ -130,8 +128,8 @@ class ChatCLI:
                 print()  # New line sau khi hoàn thành
                 
                 # Log response để debug nếu cần
-                if response_buffer:
-                    logger.info(f"Complete response: {response_buffer}")
+                # if response_buffer:
+                #     logger.info(f"Complete response: {response_buffer}")
                     
             else:
                 # Fallback về sync version nếu streaming không có
