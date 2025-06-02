@@ -49,6 +49,7 @@ class ProductSearch:
     def process_text(self, text: str) -> torch.Tensor:
         """Xử lý text và tạo vector"""
         try:
+            print("text: ", text)
             with torch.no_grad():
                 text_inputs = self.processor(text=text, return_tensors="pt", padding=True)
                 text_features = self.model.get_text_features(**text_inputs)
@@ -91,7 +92,6 @@ class ProductSearch:
         """Tìm kiếm sản phẩm bằng text"""
         limit = limit or self.default_limit
         text_vector = self.process_text(text)
-        
         if text_vector is None:
             return []
 
@@ -102,7 +102,7 @@ class ProductSearch:
             for field, value in filter_params.items():
                 conditions.append(FieldCondition(key=field, match=MatchValue(value=value)))
             search_filter = Filter(must=conditions)
-
+        print("search_filter: ", search_filter)
         # Thực hiện tìm kiếm
         search_results = self.qdrant_client.search(
             collection_name="product_texts",

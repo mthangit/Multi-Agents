@@ -1,3 +1,3 @@
-from .search_chain import SearchChain
+from .search_graph import SearchChain
 
 __all__ = ["SearchChain"]

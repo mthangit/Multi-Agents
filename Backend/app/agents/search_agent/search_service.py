@@ -44,21 +44,16 @@ class ProductSearch:
             logger.info(f"Đang tải model mặc định {model_name}")
             self.model = CLIPModel.from_pretrained(model_name)
             
-            # Nếu có đường dẫn mô hình tùy chỉnh, thử tải
             if custom_model_path and os.path.exists(custom_model_path):
                 logger.info(f"Đang tải mô hình tùy chỉnh từ {custom_model_path}")
                 try:
-                    # Tải mô hình từ file .pt với map_location để chuyển sang CPU
                     checkpoint = torch.load(custom_model_path, map_location=torch.device('cpu'))
                     
-                    # Kiểm tra xem có phải checkpoint từ quá trình fine-tuning không
                     if isinstance(checkpoint, dict) and 'model_state_dict' in checkpoint:
                         logger.info("Phát hiện checkpoint từ quá trình fine-tuning")
-                        # Chỉ lấy model_state_dict từ checkpoint
                         self.model.load_state_dict(checkpoint['model_state_dict'])
                         logger.info("Đã tải thành công model_state_dict từ checkpoint")
                     elif isinstance(checkpoint, dict):
-                        # Thử tải trực tiếp nếu có vẻ như là state_dict thuần túy
                         logger.info("Thử tải state_dict trực tiếp")
                         self.model.load_state_dict(checkpoint)
                         logger.info("Đã tải thành công state_dict")
@@ -80,17 +75,13 @@ class ProductSearch:
             logger.error(f"Lỗi khi tải model: {e}")
             raise
 
-        # Khởi tạo Qdrant client
         self.qdrant_client = QdrantClient(qdrant_host, port=qdrant_port)
         logger.info(f"Đã kết nối đến Qdrant tại {qdrant_host}:{qdrant_port}")
 
-        # Số lượng kết quả trả về mặc định
         self.default_limit = default_limit
 
-        # Kích thước cache
         self.cache_size = cache_size
 
-        # Cache các kết quả tìm kiếm
         self.process_image = lru_cache(maxsize=cache_size)(self._process_image)
         self.process_text = lru_cache(maxsize=cache_size)(self._process_text)
 
@@ -123,12 +114,37 @@ class ProductSearch:
             Vector đặc trưng của văn bản
         """
         try:
-            with torch.no_grad():
-                text_inputs = self.processor(
-                    text=text, return_tensors="pt", padding=True
-                )
-                text_features = self.model.get_text_features(**text_inputs)
-                return text_features.numpy()[0]
+            # Tạo các biến thể của truy vấn để tăng khả năng tìm kiếm
+            text_variants = [text]
+            
+            # Thêm biến thể viết thường
+            text_variants.append(text.lower())
+            
+            # Thêm biến thể viết hoa mỗi từ
+            text_variants.append(text.title())
+            
+            # Tránh lỗi với dấu câu
+            text_clean = text.replace(',', '').replace('.', '')
+            if text_clean != text:
+                text_variants.append(text_clean)
+            
+            # Tạo embedding cho mỗi biến thể
+            embeddings = []
+            for variant in text_variants:
+                with torch.no_grad():
+                    text_inputs = self.processor(
+                        text=variant, return_tensors="pt", padding=True
+                    )
+                    text_features = self.model.get_text_features(**text_inputs)
+                    embeddings.append(text_features.numpy()[0])
+            
+            # Lấy vector trung bình của tất cả biến thể
+            if embeddings:
+                return embeddings[0]  # Chỉ dùng biến thể đầu tiên để đảm bảo tương thích
+            else:
+                logger.error(f"Không thể tạo embedding cho text: {text}")
+                return None
+            
         except Exception as e:
             logger.error(f"Error processing text: {e}")
             return None
@@ -230,9 +246,13 @@ class ProductSearch:
             Danh sách sản phẩm hoặc generator các sản phẩm
         """
         limit = limit or self.default_limit
+
+        logger.info(f"Tìm kiếm văn bản: '{text}' với filter: {filter_params}")
+        
         text_vector = self.process_text(text)
 
         if text_vector is None:
+            logger.error(f"Không thể tạo vector cho văn bản: '{text}'")
             return [] if not streaming else (yield from [])
 
         # Tạo filter nếu có
@@ -244,21 +264,38 @@ class ProductSearch:
                     FieldCondition(key=field, match=MatchValue(value=value))
                 )
             search_filter = Filter(must=conditions)
+            logger.info(f"Sử dụng filter: {search_filter}")
 
         # Thực hiện tìm kiếm
-        search_results = self.qdrant_client.search(
-            collection_name="product_texts",
-            query_vector=text_vector.tolist(),
-            limit=limit,
-            query_filter=search_filter
-        )
+        try:
+            search_results = self.qdrant_client.search(
+                collection_name="product_texts",
+                query_vector=text_vector.tolist(),
+                limit=limit,
+                query_filter=search_filter
+            )
 
-        # Streaming hoặc trả về tất cả
-        if streaming:
-            for hit in search_results:
-                yield hit.payload
-        else:
-            return [hit.payload for hit in search_results]
+            search_results = list(search_results)
+
+            logger.info(f"Tìm thấy {len(search_results)} kết quả")
+            if len(search_results) > 0:
+                for i, hit in enumerate(search_results[:3]):
+                    logger.info(f"Kết quả #{i+1}: {hit.payload.get('name')} - {hit.payload.get('description')}")
+            else:
+                logger.warning(f"Không tìm thấy kết quả cho query '{text}' với filter {filter_params}")
+            
+            result_payloads = [hit.payload for hit in search_results]
+
+
+            # Streaming hoặc trả về tất cả
+            if streaming:
+                for payload in result_payloads:
+                    yield payload
+            else:
+                return result_payloads
+        except Exception as e:
+            logger.error(f"Lỗi khi tìm kiếm văn bản: {e}")
+            return [] if not streaming else (yield from [])
 
     def search_combined(
         self,
@@ -389,7 +426,6 @@ class ProductSearch:
             Kết quả được định dạng thành JSON
         """
         products = []
-        
         for product in results:
             products.append({
                 "product_id": product.get("product_id", ""),
@@ -397,10 +433,10 @@ class ProductSearch:
                 "brand": product.get("brand", ""),
                 "price": product.get("price", 0),
                 "description": product.get("description", ""),
-                "image_url": product.get("image_url", ""),
-                "frame_shape": product.get("frame_shape", ""),
-                "frame_color": product.get("frame_color", ""),
-                "frame_material": product.get("frame_material", ""),
+                "image_url": product.get("images", [""])[0] if product.get("images") else "",
+                "frame_color": product.get("color", ""),
+                "category": product.get("category", ""),
+                "gender": product.get("gender", ""),
                 "score": product.get("score", 0),
             })
         
@@ -409,6 +445,11 @@ class ProductSearch:
             summary = "Không tìm thấy sản phẩm phù hợp."
         else:
             summary_parts = []
+            
+            # Thêm thông tin về danh mục sản phẩm nếu có
+            categories = set(p["category"] for p in products if p["category"])
+            if categories:
+                summary_parts.append(f"danh mục {', '.join(categories)}")
             
             # Nếu có recommended_shapes, thêm vào summary
             if recommended_shapes:
@@ -421,6 +462,11 @@ class ProductSearch:
             # Nếu có query_text, thêm vào summary
             if query_text:
                 summary_parts.append(f"với yêu cầu '{query_text}'")
+            
+            # Thông tin về thương hiệu
+            brands = set(p["brand"] for p in products if p["brand"])
+            if brands and len(brands) <= 3:
+                summary_parts.append(f"thương hiệu {', '.join(brands)}")
             
             # Liệt kê 3 sản phẩm đầu tiên
             if products:
