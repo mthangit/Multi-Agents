@@ -1,154 +1,127 @@
 import os
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, Any, Optional, List
+import base64
+from fastapi import HTTPException
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from .chains.search_graph import SearchChain
 
-from .tools.search_tools import get_search_tools
-from .prompts.search_prompts import SEARCH_AGENT_PROMPT, get_search_prompt_with_analysis
-from .chains.search_chain import SearchChain
-
-
-# Thiết lập logging
+# Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class SearchAgent:
-    """Agent tìm kiếm sản phẩm kính mắt.
-    
-    Cung cấp khả năng tìm kiếm sản phẩm kính mắt dựa trên văn bản và/hoặc hình ảnh.
-    Có thể kết hợp với phân tích khuôn mặt từ host agent để tìm kiếm sản phẩm phù hợp.
+    """
+    Agent tìm kiếm sản phẩm kính mắt.
     """
     
-    def __init__(self, api_key=None, streaming=True):
-        """Khởi tạo SearchAgent.
-        
-        Args:
-            api_key: API key cho mô hình LLM (mặc định lấy từ biến môi trường GOOGLE_API_KEY)
-            streaming: Bật/tắt chế độ streaming kết quả
+    def __init__(self):
         """
-        # Lấy API key từ biến môi trường nếu không được cung cấp
-        self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
-        print("api_key: ", api_key)
-        self.streaming = streaming
+        Khởi tạo SearchAgent.
+        """
+        # Lấy API key từ biến môi trường
+        api_key = os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            logger.warning("GOOGLE_API_KEY không được cấu hình, một số chức năng có thể không hoạt động")
         
-        # Khởi tạo search chain
-        self.search_chain = SearchChain(api_key=self.api_key, streaming=streaming)
+        # Cấu hình Qdrant
+        qdrant_host = os.environ.get("QDRANT_HOST", "localhost")
+        qdrant_port = int(os.environ.get("QDRANT_PORT", "6333"))
+        
+        # Đường dẫn đến mô hình CLIP tùy chỉnh
+        custom_model_path = os.environ.get(
+            "CLIP_MODEL_PATH", 
+            os.path.join(os.path.dirname(__file__), "models/clip/CLIP_FTMT.pt")
+        )
+        
+        # Khởi tạo SearchChain
+        self.search_chain = SearchChain(
+            api_key=api_key,
+            streaming=False,  # Tắt streaming để đơn giản hóa
+            qdrant_host=qdrant_host,
+            qdrant_port=qdrant_port,
+            custom_model_path=custom_model_path
+        )
+        
+        logger.info("SearchAgent đã được khởi tạo thành công")
     
-    async def process_request(
-        self, 
-        query_text: Optional[str] = None, 
-        image_data: Optional[bytes] = None, 
-        analysis_result: Optional[Dict] = None,
-        callbacks: Optional[List] = None
+    async def search(
+        self,
+        query: Optional[str] = None,
+        image_data: Optional[bytes] = None,
+        analysis_result: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
-        """Xử lý yêu cầu tìm kiếm từ người dùng hoặc host agent.
+        """
+        Thực hiện tìm kiếm sản phẩm.
         
         Args:
-            query_text: Văn bản truy vấn từ người dùng
-            image_data: Dữ liệu hình ảnh (nếu có)
-            analysis_result: Kết quả phân tích khuôn mặt từ host agent (nếu có)
-            callbacks: Các callback handler (cho streaming)
+            query: Câu truy vấn tìm kiếm
+            image_data: Dữ liệu hình ảnh
+            analysis_result: Kết quả phân tích khuôn mặt
             
         Returns:
-            Kết quả tìm kiếm sản phẩm định dạng JSON
+            Dict chứa kết quả tìm kiếm
         """
-        logger.info(f"Xử lý yêu cầu tìm kiếm: {query_text}")
-        
-        # Áp dụng callback streaming nếu được bật
-        if self.streaming and not callbacks:
-            callbacks = [StreamingStdOutCallbackHandler()]
-        
-        # Lọc analysis_result để đảm bảo định dạng chính xác
-        filtered_analysis = self._validate_analysis_result(analysis_result)
-        
-        # Gọi search chain để xử lý yêu cầu
         try:
+            # Kiểm tra đầu vào
+            if not query and not image_data:
+                raise HTTPException(
+                    status_code=400, 
+                    detail="Phải cung cấp ít nhất một trong hai: query hoặc image_data"
+                )
+            
+            # Gọi SearchChain để thực hiện tìm kiếm
             result = await self.search_chain.arun(
-                query=query_text,
+                query=query,
                 image_data=image_data,
-                analysis_result=filtered_analysis,
-                callbacks=callbacks
+                analysis_result=analysis_result
             )
-            return self._format_response(result)
+            
+            return result
+            
         except Exception as e:
-            logger.error(f"Lỗi khi xử lý yêu cầu tìm kiếm: {str(e)}")
-            return self._format_error_response(str(e))
+            logger.error(f"Lỗi khi thực hiện tìm kiếm: {e}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"Lỗi khi thực hiện tìm kiếm: {str(e)}"
+            )
     
-    def _validate_analysis_result(self, analysis_result: Optional[Dict]) -> Optional[Dict]:
-        """Xác thực và lọc kết quả phân tích khuôn mặt.
+    def search_sync(
+        self,
+        query: Optional[str] = None,
+        image_data: Optional[bytes] = None,
+        analysis_result: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Thực hiện tìm kiếm sản phẩm (phiên bản đồng bộ).
         
         Args:
-            analysis_result: Kết quả phân tích khuôn mặt từ host agent
+            query: Câu truy vấn tìm kiếm
+            image_data: Dữ liệu hình ảnh
+            analysis_result: Kết quả phân tích khuôn mặt
             
         Returns:
-            Kết quả phân tích đã được xác thực
+            Dict chứa kết quả tìm kiếm
         """
-        if not analysis_result:
-            return None
-        
-        # Kiểm tra các trường bắt buộc
-        required_fields = ["face_detected"]
-        for field in required_fields:
-            if field not in analysis_result:
-                logger.warning(f"Kết quả phân tích thiếu trường {field}")
-                return None
-        
-        # Xác thực face_detected
-        if not analysis_result.get("face_detected"):
-            logger.info("Không phát hiện khuôn mặt trong kết quả phân tích")
-        
-        return analysis_result
-    
-    def _format_response(self, result: Dict) -> Dict:
-        """Định dạng kết quả để trả về cho người dùng hoặc host agent.
-        
-        Args:
-            result: Kết quả từ search_chain
+        try:
+            # Kiểm tra đầu vào
+            if not query and not image_data:
+                raise ValueError("Phải cung cấp ít nhất một trong hai: query hoặc image_data")
             
-        Returns:
-            Kết quả đã được định dạng
-        """
-        # Đảm bảo kết quả luôn có định dạng nhất quán
-        response = {
-            "success": True,
-            "results": result.get("results", {}) or {},
-            "analysis": result.get("analysis", None),
-            "message": result.get("message", "")
-        }
-        
-        # Đảm bảo results có các trường bắt buộc
-        if "results" in response and isinstance(response["results"], dict):
-            if "summary" not in response["results"]:
-                response["results"]["summary"] = "Kết quả tìm kiếm sản phẩm kính mắt."
+            # Gọi SearchChain để thực hiện tìm kiếm
+            result = self.search_chain.run(
+                query=query,
+                image_data=image_data,
+                analysis_result=analysis_result
+            )
             
-            if "products" not in response["results"]:
-                response["results"]["products"] = []
+            return result
             
-            if "count" not in response["results"]:
-                response["results"]["count"] = len(response["results"].get("products", []))
-        
-        return response
-    
-    def _format_error_response(self, error_message: str) -> Dict:
-        """Định dạng thông báo lỗi.
-        
-        Args:
-            error_message: Thông báo lỗi
-            
-        Returns:
-            Thông báo lỗi đã được định dạng
-        """
-        return {
-            "success": False,
-            "results": {
+        except Exception as e:
+            logger.error(f"Lỗi khi thực hiện tìm kiếm: {e}")
+            return {
+                "error": str(e),
                 "products": [],
                 "count": 0,
                 "summary": "Đã xảy ra lỗi khi tìm kiếm sản phẩm."
-            },
-            "message": f"Lỗi: {error_message}"
-        }
+            }

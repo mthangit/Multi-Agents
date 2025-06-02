@@ -25,6 +25,7 @@ from app.common.types import (
 )
 
 from ..agent import SearchAgent
+from ..data.filter_constants import get_filter_options
 
 # Thiết lập logging
 logging.basicConfig(level=logging.INFO)
@@ -322,6 +323,12 @@ def extract_message_parts(message: Dict) -> tuple:
 def format_sse_event(data: Dict) -> str:
     """Format dữ liệu thành SSE event."""
     return f"data: {json.dumps(data)}\n\n"
+
+# Thêm endpoint
+@app.get("/filters", tags=["Search"])
+async def get_filters():
+    """Trả về danh sách các tùy chọn lọc được hỗ trợ."""
+    return get_filter_options()
 
 if __name__ == "__main__":
     import uvicorn
