@@ -1,0 +1,26 @@
+langchain>=0.1.0
+langgraph>=0.0.40
+langchain-community>=0.0.20
+langchain-google-genai>=0.0.8
+google-generativeai>=0.3.0
+qdrant-client>=1.7.0
+sentence-transformers>=2.2.2
+PyPDF2>=3.0.1
+python-dotenv>=1.0.0
+uvicorn>=0.24.0
+fastapi>=0.104.0
+pydantic>=2.5.0
+numpy>=1.24.0
+tiktoken>=0.5.0
+
+# Additional embedding models
+transformers>=4.21.0
+torch>=1.12.0
+
+# Vietnamese text processing
+regex
+unicodedata2
+
+# Advanced features
+rank-bm25
+scikit-learn 
