@@ -1,0 +1,26 @@
+fastapi
+uvicorn
+mysql-connector-python
+pydantic
+pydantic-settings
+langchain
+langchain-google-genai
+langgraph
+python-dotenv
+google-generativeai
+typing-extensions
+pytest
+httpx
+sse-starlette
+google-auth
+google-auth-oauthlib
+google-auth-httplib2
+redis
+aioredis
+websockets
+aiofiles
+jsonschema
+# CLI enhancements
+colorama
+rich
+click

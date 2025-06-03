@@ -1,0 +1,54 @@
+order_management/
+├── src/
+│   ├── api/
+│   │   ├── endpoints/
+│   │   │   ├── order.py
+│   │   │   ├── stock.py
+│   │   │   ├── chat.py
+│   │   ├── middleware/
+│   │   │   ├── auth.py
+│   │   ├── models/
+│   │   │   ├── order.py
+│   │   │   ├── stock.py
+│   │   │   ├── chat.py
+│   │   ├── main.py
+│   ├── chatbot/
+│   │   ├── nodes/
+│   │   │   ├── welcome.py
+│   │   │   ├── place_order.py
+│   │   │   ├── check_stock.py
+│   │   │   ├── check_order.py
+│   │   ├── graph.py
+│   │   ├── state.py
+│   ├── database/
+│   │   ├── schema.sql
+│   │   ├── queries/
+│   │   │   ├── order.py
+│   │   │   ├── stock.py
+│   │   ├── connection.py
+│   ├── config/
+│   │   ├── settings.py
+│   │   ├── logging.py
+│   ├── utils/
+│   │   ├── helpers.py
+│   ├── tests/
+│   │   ├── api/
+│   │   │   ├── test_order.py
+│   │   │   ├── test_stock.py
+│   │   ├── chatbot/
+│   │   │   ├── test_graph.py
+│   │   ├── database/
+│   │   │   ├── test_queries.py
+├── docs/
+│   ├── api.md
+│   ├── setup.md
+│   ├── architecture.md
+├── scripts/
+│   ├── migrate_db.sh
+│   ├── seed_data.sql
+├── .env
+├── .gitignore
+├── README.md
+├── requirements.txt
+├── docker-compose.yml
+├── Dockerfile

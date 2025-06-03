@@ -32,3 +32,6 @@ if __name__ == "__main__":
     load_dotenv()
     # Chạy ứng dụng
     main() 
+
+
+# python -m app.agents.search_agent.run_server --host 0.0.0.0 --port 8001 --reload

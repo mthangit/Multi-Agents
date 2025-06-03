@@ -1,0 +1,28 @@
+# Thư mục data để chứa các file PDF
+
+Đặt các file PDF của bạn vào thư mục này để nạp vào hệ thống.
+
+## Cách sử dụng:
+
+1. Copy file PDF vào thư mục này
+2. Chạy lệnh nạp dữ liệu:
+   ```bash
+   python ingest_data.py data/
+   ```
+
+## Định dạng file hỗ trợ:
+- `.pdf` - File PDF thông thường
+- Tự động scan recursive trong subfolder
+
+## Ví dụ cấu trúc:
+```
+data/
+├── research_papers/
+│   ├── paper1.pdf
+│   └── paper2.pdf
+├── manuals/
+│   ├── user_guide.pdf
+│   └── technical_spec.pdf
+└── reports/
+    └── annual_report.pdf
+``` 

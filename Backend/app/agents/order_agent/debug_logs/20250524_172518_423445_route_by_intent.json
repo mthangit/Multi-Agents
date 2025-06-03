@@ -1,0 +1,16 @@
+{
+  "message": "Bạn giúp tôi tìm các sản phảm có id 1045770845",
+  "intent": "find_product_by_id",
+  "parameters": null,
+  "product": null,
+  "products": null,
+  "order_id": null,
+  "order": null,
+  "error": null,
+  "cart_items": null,
+  "conversation_stage": null,
+  "collected_info": {},
+  "pending_questions": [],
+  "user_session_id": "e36841fb-a68f-4ae6-beb7-77c333b59f04",
+  "response": null
+}
