@@ -8,11 +8,11 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String(100), unique=True, index=True)
-    email = Column(String(100), unique=True, index=True)
-    hashed_password = Column(String(255))
-    is_active = Column(Boolean, default=True)
+    name = Column(String(255))
+    email = Column(String(255), unique=True, index=True)
+    password = Column(String(255))
     is_admin = Column(Boolean, default=False)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -28,13 +28,15 @@ class Address(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    address_line = Column(String(255))
+    name = Column(String(255))
+    phone = Column(String(20))
+    address = Column(Text)
     city = Column(String(100))
-    state = Column(String(100))
-    postal_code = Column(String(20))
+    state = Column(String(100), nullable=True)
     country = Column(String(100))
     is_default = Column(Boolean, default=False)
-    phone = Column(String(20))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     user = relationship("User", back_populates="addresses")
@@ -47,8 +49,25 @@ class Product(Base):
     name = Column(String(255), index=True)
     description = Column(Text)
     price = Column(Float)
-    image_url = Column(String(255))
+    image = Column(String(255))
+    brand = Column(String(255), nullable=True)
     category = Column(String(100), index=True)
+    gender = Column(String(20), nullable=True)
+    weight = Column(String(20), nullable=True)
+    quantity = Column(Integer, nullable=True)
+    images = Column(String(255), nullable=True)
+    rating = Column(Float, nullable=True)
+    newPrice = Column(Float, nullable=True)
+    trending = Column(Boolean, nullable=True)
+    frameMaterial = Column(String(100), nullable=True)
+    lensMaterial = Column(String(100), nullable=True)
+    lensFeatures = Column(String(100), nullable=True)
+    frameShape = Column(String(50), nullable=True)
+    lensWidth = Column(String(10), nullable=True)
+    bridgeWidth = Column(String(10), nullable=True)
+    templeLength = Column(String(10), nullable=True)
+    color = Column(String(50), nullable=True)
+    availability = Column(String(20), nullable=True)
     stock = Column(Integer, default=0)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -77,12 +96,14 @@ class CartDetail(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     cart_id = Column(Integer, ForeignKey("carts.id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(String(36))
     quantity = Column(Integer, default=1)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     cart = relationship("Cart", back_populates="cart_details")
-    product = relationship("Product", back_populates="cart_details")
+    product = relationship("Product", back_populates="cart_details", foreign_keys=[product_id], primaryjoin="CartDetail.product_id == Product.id")
 
 
 class Invoice(Base):
@@ -90,16 +111,19 @@ class Invoice(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"))
-    total_amount = Column(Float)
-    shipping_address = Column(String(255))
-    phone = Column(String(20))
+    address_id = Column(Integer, ForeignKey("addresses.id"))
+    total_items = Column(Integer)
+    actual_price = Column(Float)
+    total_price = Column(Float)
     payment_method = Column(String(50))
-    status = Column(String(50), default="pending")
+    payment_status = Column(String(50), default="pending")
+    order_status = Column(String(50), default="processing")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     user = relationship("User", back_populates="invoices")
+    address = relationship("Address")
     invoice_details = relationship("InvoiceDetail", back_populates="invoice")
 
 
@@ -108,13 +132,15 @@ class InvoiceDetail(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     invoice_id = Column(Integer, ForeignKey("invoices.id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(String(36))
     quantity = Column(Integer)
     price = Column(Float)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     invoice = relationship("Invoice", back_populates="invoice_details")
-    product = relationship("Product", back_populates="invoice_details")
+    product = relationship("Product", back_populates="invoice_details", foreign_keys=[product_id], primaryjoin="InvoiceDetail.product_id == Product.id")
 
 
 class Wishlist(Base):
@@ -134,8 +160,10 @@ class WishlistDetail(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     wishlist_id = Column(Integer, ForeignKey("wishlist.id"))
-    product_id = Column(Integer, ForeignKey("products.id"))
+    product_id = Column(String(36))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
     wishlist = relationship("Wishlist", back_populates="wishlist_details")
-    product = relationship("Product", back_populates="wishlist_details") 
+    product = relationship("Product", back_populates="wishlist_details", foreign_keys=[product_id], primaryjoin="WishlistDetail.product_id == Product.id") 

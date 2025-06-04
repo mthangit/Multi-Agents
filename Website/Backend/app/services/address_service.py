@@ -22,12 +22,12 @@ def create_address(db: Session, user_id: int, address: address_schema.AddressCre
     # Tạo địa chỉ mới
     db_address = Address(
         user_id=user_id,
-        address_line=address.address_line,
+        name=address.name,
+        phone=address.phone,
+        address=address.address,
         city=address.city,
         state=address.state,
-        postal_code=address.postal_code,
         country=address.country,
-        phone=address.phone,
         is_default=address.is_default
     )
     
@@ -56,18 +56,18 @@ def update_address(db: Session, user_id: int, address_id: int, address: address_
         db.query(Address).filter(Address.user_id == user_id).update({"is_default": False})
     
     # Cập nhật thông tin địa chỉ
-    if address.address_line is not None:
-        db_address.address_line = address.address_line
+    if address.name is not None:
+        db_address.name = address.name
+    if address.phone is not None:
+        db_address.phone = address.phone
+    if address.address is not None:
+        db_address.address = address.address
     if address.city is not None:
         db_address.city = address.city
     if address.state is not None:
         db_address.state = address.state
-    if address.postal_code is not None:
-        db_address.postal_code = address.postal_code
     if address.country is not None:
         db_address.country = address.country
-    if address.phone is not None:
-        db_address.phone = address.phone
     if address.is_default is not None:
         db_address.is_default = address.is_default
     

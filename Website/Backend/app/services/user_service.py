@@ -20,21 +20,20 @@ def create_user(db: Session, user: user_schema.UserCreate):
             detail="Email already registered"
         )
     
-    # Kiểm tra username đã tồn tại chưa
-    db_user = db.query(User).filter(User.username == user.username).first()
+    # Kiểm tra name đã tồn tại chưa
+    db_user = db.query(User).filter(User.name == user.name).first()
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already registered"
+            detail="Name already registered"
         )
     
     # Tạo người dùng mới
     hashed_password = get_password_hash(user.password)
     db_user = User(
-        username=user.username,
+        name=user.name,
         email=user.email,
-        hashed_password=hashed_password,
-        is_active=True,
+        password=hashed_password,
         is_admin=False
     )
     db.add(db_user)
@@ -48,7 +47,7 @@ def authenticate_user(db: Session, email: str, password: str):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return False
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user.password):
         return False
     return user
 
@@ -66,7 +65,7 @@ def login_user(db: Session, user_data: user_schema.UserLogin):
     # Tạo access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "id": user.id},
+        data={"sub": user.name, "id": user.id},
         expires_delta=access_token_expires
     )
     
@@ -74,7 +73,7 @@ def login_user(db: Session, user_data: user_schema.UserLogin):
         "encodedToken": access_token,
         "foundUser": {
             "id": user.id,
-            "username": user.username,
+            "name": user.name,
             "email": user.email,
             "is_admin": user.is_admin
         }
@@ -102,14 +101,12 @@ def update_user(db: Session, user_id: int, user_data: user_schema.UserUpdate):
     db_user = get_user_by_id(db, user_id)
     
     # Cập nhật thông tin
-    if user_data.username is not None:
-        db_user.username = user_data.username
+    if user_data.name is not None:
+        db_user.name = user_data.name
     if user_data.email is not None:
         db_user.email = user_data.email
     if user_data.password is not None:
-        db_user.hashed_password = get_password_hash(user_data.password)
-    if user_data.is_active is not None:
-        db_user.is_active = user_data.is_active
+        db_user.password = get_password_hash(user_data.password)
     
     db.commit()
     db.refresh(db_user)

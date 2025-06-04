@@ -52,9 +52,26 @@ def create_product(db: Session, product: product_schema.ProductCreate):
         name=product.name,
         description=product.description,
         price=product.price,
-        image_url=product.image_url,
+        image=product.image,
         category=product.category,
-        stock=product.stock
+        stock=product.stock,
+        brand=product.brand,
+        gender=product.gender,
+        weight=product.weight,
+        quantity=product.quantity,
+        images=product.images,
+        rating=product.rating,
+        newPrice=product.newPrice,
+        trending=product.trending,
+        frameMaterial=product.frameMaterial,
+        lensMaterial=product.lensMaterial,
+        lensFeatures=product.lensFeatures,
+        frameShape=product.frameShape,
+        lensWidth=product.lensWidth,
+        bridgeWidth=product.bridgeWidth,
+        templeLength=product.templeLength,
+        color=product.color,
+        availability=product.availability
     )
     db.add(db_product)
     db.commit()
@@ -73,12 +90,46 @@ def update_product(db: Session, product_id: int, product: product_schema.Product
         db_product.description = product.description
     if product.price is not None:
         db_product.price = product.price
-    if product.image_url is not None:
-        db_product.image_url = product.image_url
+    if product.image is not None:
+        db_product.image = product.image
     if product.category is not None:
         db_product.category = product.category
     if product.stock is not None:
         db_product.stock = product.stock
+    if product.brand is not None:
+        db_product.brand = product.brand
+    if product.gender is not None:
+        db_product.gender = product.gender
+    if product.weight is not None:
+        db_product.weight = product.weight
+    if product.quantity is not None:
+        db_product.quantity = product.quantity
+    if product.images is not None:
+        db_product.images = product.images
+    if product.rating is not None:
+        db_product.rating = product.rating
+    if product.newPrice is not None:
+        db_product.newPrice = product.newPrice
+    if product.trending is not None:
+        db_product.trending = product.trending
+    if product.frameMaterial is not None:
+        db_product.frameMaterial = product.frameMaterial
+    if product.lensMaterial is not None:
+        db_product.lensMaterial = product.lensMaterial
+    if product.lensFeatures is not None:
+        db_product.lensFeatures = product.lensFeatures
+    if product.frameShape is not None:
+        db_product.frameShape = product.frameShape
+    if product.lensWidth is not None:
+        db_product.lensWidth = product.lensWidth
+    if product.bridgeWidth is not None:
+        db_product.bridgeWidth = product.bridgeWidth
+    if product.templeLength is not None:
+        db_product.templeLength = product.templeLength
+    if product.color is not None:
+        db_product.color = product.color
+    if product.availability is not None:
+        db_product.availability = product.availability
     
     db.commit()
     db.refresh(db_product)
