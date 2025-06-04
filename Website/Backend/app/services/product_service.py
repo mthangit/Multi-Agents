@@ -31,7 +31,39 @@ def get_products(
         query = query.filter(Product.name.ilike(f"%{search}%"))
     
     # Phân trang
-    products = query.offset(skip).limit(limit).all()
+    db_products = query.offset(skip).limit(limit).all()
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang schema Pydantic
+    products = []
+    for product in db_products:
+        product_dict = {
+            "id": product.id,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "image": product.image,
+            "category": product.category,
+            "stock": product.stock,
+            "brand": product.brand,
+            "gender": product.gender,
+            "weight": product.weight,
+            "quantity": product.quantity,
+            "images": product.images,
+            "rating": product.rating,
+            "newPrice": product.newPrice,
+            "trending": product.trending,
+            "frameMaterial": product.frameMaterial,
+            "lensMaterial": product.lensMaterial,
+            "lensFeatures": product.lensFeatures,
+            "frameShape": product.frameShape,
+            "lensWidth": product.lensWidth,
+            "bridgeWidth": product.bridgeWidth,
+            "templeLength": product.templeLength,
+            "color": product.color,
+            "availability": product.availability
+        }
+        products.append(product_dict)
+    
     return products
 
 
@@ -43,7 +75,36 @@ def get_product(db: Session, product_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Product not found"
         )
-    return product
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    product_dict = {
+        "id": product.id,
+        "name": product.name,
+        "description": product.description,
+        "price": product.price,
+        "image": product.image,
+        "category": product.category,
+        "stock": product.stock,
+        "brand": product.brand,
+        "gender": product.gender,
+        "weight": product.weight,
+        "quantity": product.quantity,
+        "images": product.images,
+        "rating": product.rating,
+        "newPrice": product.newPrice,
+        "trending": product.trending,
+        "frameMaterial": product.frameMaterial,
+        "lensMaterial": product.lensMaterial,
+        "lensFeatures": product.lensFeatures,
+        "frameShape": product.frameShape,
+        "lensWidth": product.lensWidth,
+        "bridgeWidth": product.bridgeWidth,
+        "templeLength": product.templeLength,
+        "color": product.color,
+        "availability": product.availability
+    }
+    
+    return product_dict
 
 
 def create_product(db: Session, product: product_schema.ProductCreate):
@@ -76,12 +137,46 @@ def create_product(db: Session, product: product_schema.ProductCreate):
     db.add(db_product)
     db.commit()
     db.refresh(db_product)
-    return db_product
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    product_dict = {
+        "id": db_product.id,
+        "name": db_product.name,
+        "description": db_product.description,
+        "price": db_product.price,
+        "image": db_product.image,
+        "category": db_product.category,
+        "stock": db_product.stock,
+        "brand": db_product.brand,
+        "gender": db_product.gender,
+        "weight": db_product.weight,
+        "quantity": db_product.quantity,
+        "images": db_product.images,
+        "rating": db_product.rating,
+        "newPrice": db_product.newPrice,
+        "trending": db_product.trending,
+        "frameMaterial": db_product.frameMaterial,
+        "lensMaterial": db_product.lensMaterial,
+        "lensFeatures": db_product.lensFeatures,
+        "frameShape": db_product.frameShape,
+        "lensWidth": db_product.lensWidth,
+        "bridgeWidth": db_product.bridgeWidth,
+        "templeLength": db_product.templeLength,
+        "color": db_product.color,
+        "availability": db_product.availability
+    }
+    
+    return product_dict
 
 
 def update_product(db: Session, product_id: int, product: product_schema.ProductUpdate):
     """Cập nhật thông tin sản phẩm (chỉ dành cho admin)"""
-    db_product = get_product(db, product_id)
+    db_product = db.query(Product).filter(Product.id == product_id).first()
+    if not db_product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
     
     # Cập nhật thông tin
     if product.name is not None:
@@ -133,7 +228,36 @@ def update_product(db: Session, product_id: int, product: product_schema.Product
     
     db.commit()
     db.refresh(db_product)
-    return db_product
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    product_dict = {
+        "id": db_product.id,
+        "name": db_product.name,
+        "description": db_product.description,
+        "price": db_product.price,
+        "image": db_product.image,
+        "category": db_product.category,
+        "stock": db_product.stock,
+        "brand": db_product.brand,
+        "gender": db_product.gender,
+        "weight": db_product.weight,
+        "quantity": db_product.quantity,
+        "images": db_product.images,
+        "rating": db_product.rating,
+        "newPrice": db_product.newPrice,
+        "trending": db_product.trending,
+        "frameMaterial": db_product.frameMaterial,
+        "lensMaterial": db_product.lensMaterial,
+        "lensFeatures": db_product.lensFeatures,
+        "frameShape": db_product.frameShape,
+        "lensWidth": db_product.lensWidth,
+        "bridgeWidth": db_product.bridgeWidth,
+        "templeLength": db_product.templeLength,
+        "color": db_product.color,
+        "availability": db_product.availability
+    }
+    
+    return product_dict
 
 
 def delete_product(db: Session, product_id: int):

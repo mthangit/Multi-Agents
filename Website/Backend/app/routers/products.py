@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from sqlalchemy.orm import Session
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.database.database import get_db
 from app.schemas import product as product_schema
 from app.services import product_service
@@ -11,7 +11,7 @@ router = APIRouter(tags=["Products"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/products", response_model=dict)
+@router.get("/products", response_model=Dict[str, List[Dict[str, Any]]])
 def get_products(
     skip: int = 0,
     limit: int = 100,
@@ -30,7 +30,7 @@ def get_products(
     return {"products": products}
 
 
-@router.get("/products/{product_id}", response_model=product_schema.Product)
+@router.get("/products/{product_id}", response_model=Dict[str, Any])
 def get_product(product_id: int, db: Session = Depends(get_db)):
     """
     Lấy thông tin chi tiết sản phẩm theo ID
@@ -38,7 +38,7 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
     return product_service.get_product(db, product_id)
 
 
-@router.get("/categories", response_model=dict)
+@router.get("/categories", response_model=Dict[str, List[str]])
 def get_categories(db: Session = Depends(get_db)):
     """
     Lấy danh sách các danh mục sản phẩm
