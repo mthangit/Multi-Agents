@@ -6,7 +6,7 @@ import time
 import uvicorn
 from app.routers import auth, products, cart, wishlist, checkout, address, admin
 from app.database.database import engine, Base
-from app.utils.tracing import init_tracer
+# from app.utils.tracing import init_tracer
 from app.config import settings
 
 # Cấu hình logging
@@ -17,7 +17,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Khởi tạo Jaeger tracer
-tracer = init_tracer()
+# tracer = init_tracer()
 
 # Tạo các bảng trong database
 Base.metadata.create_all(bind=engine)
