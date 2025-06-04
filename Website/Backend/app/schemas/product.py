@@ -63,7 +63,7 @@ class Product(ProductBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ProductInCart(BaseModel):
@@ -74,4 +74,4 @@ class ProductInCart(BaseModel):
     quantity: int
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 

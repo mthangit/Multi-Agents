@@ -31,7 +31,7 @@ class UserInDB(UserBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class User(UserBase):
@@ -40,7 +40,7 @@ class User(UserBase):
     email_verified_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Token(BaseModel):

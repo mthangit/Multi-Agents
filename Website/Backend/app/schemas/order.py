@@ -18,7 +18,7 @@ class OrderItem(OrderItemBase):
     invoice_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class OrderItemDetail(OrderItemBase):
@@ -27,7 +27,7 @@ class OrderItemDetail(OrderItemBase):
     product_description: Optional[str] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class OrderBase(BaseModel):
@@ -51,11 +51,11 @@ class Order(OrderBase):
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class OrderDetail(Order):
     items: List[OrderItemDetail] = []
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 
