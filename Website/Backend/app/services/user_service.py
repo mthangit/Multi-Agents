@@ -103,7 +103,21 @@ def get_user_by_id(db: Session, user_id: int):
 
 def get_all_users(db: Session, skip: int = 0, limit: int = 100):
     """Lấy danh sách người dùng"""
-    return db.query(User).offset(skip).limit(limit).all()
+    db_users = db.query(User).offset(skip).limit(limit).all()
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict phù hợp với schema
+    users = []
+    for user in db_users:
+        user_dict = {
+            "id": user.id,
+            "username": user.name,  # Chuyển name thành username
+            "email": user.email,
+            "is_admin": user.is_admin,
+            "email_verified_at": user.email_verified_at
+        }
+        users.append(user_dict)
+    
+    return users
 
 
 def update_user(db: Session, user_id: int, user_data: user_schema.UserUpdate):
