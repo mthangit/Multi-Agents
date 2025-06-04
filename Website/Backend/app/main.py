@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 import logging
 import time
 import uvicorn
-from app.routers import auth, products, cart, wishlist, checkout, address, admin
+from app.routers import auth, product, cart, wishlist, checkout, address, admin
 from app.database.database import engine, Base
 # from app.utils.tracing import init_tracer
 from app.config import settings
@@ -54,7 +54,7 @@ async def add_process_time_header(request: Request, call_next):
 
 # Đăng ký các router
 app.include_router(auth.router, prefix="/api")
-app.include_router(products.router, prefix="/api")
+app.include_router(product.router, prefix="/api")
 app.include_router(cart.router, prefix="/api")
 app.include_router(wishlist.router, prefix="/api")
 app.include_router(checkout.router, prefix="/api")

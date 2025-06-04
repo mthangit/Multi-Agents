@@ -45,3 +45,4 @@ def get_categories(db: Session = Depends(get_db)):
     """
     categories = product_service.get_categories(db)
     return {"categories": categories} 
+
