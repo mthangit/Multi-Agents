@@ -61,8 +61,6 @@ class ProductUpdate(BaseModel):
 
 class Product(ProductBase):
     id: int
-    created_at: Optional[datetime] = None
-    updated_at: Optional[datetime] = None
 
     class Config:
         orm_mode = True

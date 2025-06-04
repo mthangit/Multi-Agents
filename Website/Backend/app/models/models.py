@@ -69,8 +69,6 @@ class Product(Base):
     color = Column(String(50), nullable=True)
     availability = Column(String(20), nullable=True)
     stock = Column(Integer, default=0)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Loại bỏ các mối quan hệ ngược từ Product để tránh lỗi
 
