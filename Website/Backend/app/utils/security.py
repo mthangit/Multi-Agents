@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from app.config import settings
@@ -14,7 +14,7 @@ from app.schemas.user import TokenData
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Cấu hình OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login", auto_error=False)
 
 
 def verify_password(plain_password, hashed_password):
@@ -102,4 +102,33 @@ async def get_current_admin_user(current_user: User = Depends(get_current_user))
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Not enough permissions"
         )
-    return current_user 
+    return current_user
+
+
+async def get_current_user_optional(
+    token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)
+):
+    """
+    Lấy thông tin người dùng hiện tại từ token nếu có
+    Nếu không có token, trả về None
+    """
+    if token is None:
+        return None
+    
+    try:
+        payload = jwt.decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        username: str = payload.get("sub")
+        user_id: int = payload.get("id")
+        if username is None or user_id is None:
+            return None
+        token_data = TokenData(username=username, user_id=user_id)
+    except JWTError:
+        return None
+    
+    user = get_user(db, username=token_data.username)
+    if user is None:
+        return None
+    
+    return user 

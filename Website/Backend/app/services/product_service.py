@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 import logging
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from app.models.models import Product
 from app.schemas import product as product_schema
 
@@ -262,13 +262,111 @@ def update_product(db: Session, product_id: int, product: product_schema.Product
 
 def delete_product(db: Session, product_id: int):
     """Xóa sản phẩm (chỉ dành cho admin)"""
-    db_product = get_product(db, product_id)
+    db_product = db.query(Product).filter(Product.id == product_id).first()
+    if not db_product:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Product not found"
+        )
+    
     db.delete(db_product)
     db.commit()
+    
     return {"message": "Product deleted successfully"}
 
 
 def get_categories(db: Session):
     """Lấy danh sách các danh mục sản phẩm"""
     categories = db.query(Product.category).distinct().all()
-    return [category[0] for category in categories if category[0]] 
+    return [category[0] for category in categories if category[0]]
+
+
+def get_product_by_id(db: Session, product_id: int) -> Dict[str, Any]:
+    """Lấy thông tin chi tiết sản phẩm theo ID"""
+    return get_product(db, product_id)
+
+
+def get_products_by_category(db: Session, category: str, skip: int = 0, limit: int = 20):
+    """Lấy danh sách sản phẩm theo danh mục"""
+    return get_products(db, skip=skip, limit=limit, category=category)
+
+
+def search_products(db: Session, query: str, skip: int = 0, limit: int = 20):
+    """Tìm kiếm sản phẩm theo từ khóa"""
+    return get_products(db, skip=skip, limit=limit, search=query)
+
+
+def get_featured_products(db: Session, limit: int = 10):
+    """Lấy danh sách sản phẩm nổi bật"""
+    db_products = db.query(Product).filter(Product.trending == True).limit(limit).all()
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang schema Pydantic
+    products = []
+    for product in db_products:
+        product_dict = {
+            "id": product.id,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "image": product.image,
+            "category": product.category,
+            "stock": product.stock,
+            "brand": product.brand,
+            "gender": product.gender,
+            "weight": product.weight,
+            "quantity": product.quantity,
+            "images": product.images,
+            "rating": product.rating,
+            "newPrice": product.newPrice,
+            "trending": product.trending,
+            "frameMaterial": product.frameMaterial,
+            "lensMaterial": product.lensMaterial,
+            "lensFeatures": product.lensFeatures,
+            "frameShape": product.frameShape,
+            "lensWidth": product.lensWidth,
+            "bridgeWidth": product.bridgeWidth,
+            "templeLength": product.templeLength,
+            "color": product.color,
+            "availability": product.availability
+        }
+        products.append(product_dict)
+    
+    return products
+
+
+def get_new_arrivals(db: Session, limit: int = 10):
+    """Lấy danh sách sản phẩm mới nhất"""
+    db_products = db.query(Product).order_by(Product.id.desc()).limit(limit).all()
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang schema Pydantic
+    products = []
+    for product in db_products:
+        product_dict = {
+            "id": product.id,
+            "name": product.name,
+            "description": product.description,
+            "price": product.price,
+            "image": product.image,
+            "category": product.category,
+            "stock": product.stock,
+            "brand": product.brand,
+            "gender": product.gender,
+            "weight": product.weight,
+            "quantity": product.quantity,
+            "images": product.images,
+            "rating": product.rating,
+            "newPrice": product.newPrice,
+            "trending": product.trending,
+            "frameMaterial": product.frameMaterial,
+            "lensMaterial": product.lensMaterial,
+            "lensFeatures": product.lensFeatures,
+            "frameShape": product.frameShape,
+            "lensWidth": product.lensWidth,
+            "bridgeWidth": product.bridgeWidth,
+            "templeLength": product.templeLength,
+            "color": product.color,
+            "availability": product.availability
+        }
+        products.append(product_dict)
+    
+    return products 

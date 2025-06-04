@@ -9,7 +9,26 @@ logger = logging.getLogger(__name__)
 
 def get_user_addresses(db: Session, user_id: int):
     """Lấy danh sách địa chỉ của người dùng"""
-    addresses = db.query(Address).filter(Address.user_id == user_id).all()
+    db_addresses = db.query(Address).filter(Address.user_id == user_id).all()
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    addresses = []
+    for address in db_addresses:
+        address_dict = {
+            "id": address.id,
+            "user_id": address.user_id,
+            "name": address.name,
+            "phone": address.phone,
+            "address": address.address,
+            "city": address.city,
+            "state": address.state,
+            "country": address.country,
+            "is_default": address.is_default,
+            "created_at": address.created_at,
+            "updated_at": address.updated_at
+        }
+        addresses.append(address_dict)
+    
     return addresses
 
 
@@ -34,7 +53,23 @@ def create_address(db: Session, user_id: int, address: address_schema.AddressCre
     db.add(db_address)
     db.commit()
     db.refresh(db_address)
-    return db_address
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    address_dict = {
+        "id": db_address.id,
+        "user_id": db_address.user_id,
+        "name": db_address.name,
+        "phone": db_address.phone,
+        "address": db_address.address,
+        "city": db_address.city,
+        "state": db_address.state,
+        "country": db_address.country,
+        "is_default": db_address.is_default,
+        "created_at": db_address.created_at,
+        "updated_at": db_address.updated_at
+    }
+    
+    return address_dict
 
 
 def update_address(db: Session, user_id: int, address_id: int, address: address_schema.AddressUpdate):
@@ -73,7 +108,23 @@ def update_address(db: Session, user_id: int, address_id: int, address: address_
     
     db.commit()
     db.refresh(db_address)
-    return db_address
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    address_dict = {
+        "id": db_address.id,
+        "user_id": db_address.user_id,
+        "name": db_address.name,
+        "phone": db_address.phone,
+        "address": db_address.address,
+        "city": db_address.city,
+        "state": db_address.state,
+        "country": db_address.country,
+        "is_default": db_address.is_default,
+        "created_at": db_address.created_at,
+        "updated_at": db_address.updated_at
+    }
+    
+    return address_dict
 
 
 def delete_address(db: Session, user_id: int, address_id: int):
