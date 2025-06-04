@@ -45,7 +45,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
 
 def get_user(db: Session, username: str):
     """Lấy thông tin người dùng từ username"""
-    return db.query(User).filter(User.username == username).first()
+    return db.query(User).filter(User.email == username).first()
 
 
 def get_user_by_email(db: Session, email: str):
@@ -58,7 +58,7 @@ def authenticate_user(db: Session, email: str, password: str):
     user = get_user_by_email(db, email)
     if not user:
         return False
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user.password):
         return False
     return user
 
