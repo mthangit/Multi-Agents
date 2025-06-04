@@ -14,7 +14,7 @@ from app.schemas.user import TokenData
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Cấu hình OAuth2
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login", auto_error=False)
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token", auto_error=False)
 
 
 def verify_password(plain_password, hashed_password):
