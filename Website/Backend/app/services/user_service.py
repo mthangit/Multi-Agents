@@ -20,18 +20,18 @@ def create_user(db: Session, user: user_schema.UserCreate):
             detail="Email already registered"
         )
     
-    # Kiểm tra name đã tồn tại chưa
-    db_user = db.query(User).filter(User.name == user.name).first()
+    # Kiểm tra username đã tồn tại chưa
+    db_user = db.query(User).filter(User.name == user.username).first()
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Name already registered"
+            detail="Username already registered"
         )
     
     # Tạo người dùng mới
     hashed_password = get_password_hash(user.password)
     db_user = User(
-        name=user.name,
+        name=user.username,
         email=user.email,
         password=hashed_password,
         is_admin=False
@@ -39,7 +39,17 @@ def create_user(db: Session, user: user_schema.UserCreate):
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    user_dict = {
+        "id": db_user.id,
+        "username": db_user.name,
+        "email": db_user.email,
+        "is_admin": db_user.is_admin,
+        "email_verified_at": db_user.email_verified_at
+    }
+    
+    return user_dict
 
 
 def authenticate_user(db: Session, email: str, password: str):
@@ -73,7 +83,7 @@ def login_user(db: Session, user_data: user_schema.UserLogin):
         "encodedToken": access_token,
         "foundUser": {
             "id": user.id,
-            "name": user.name,
+            "username": user.name,
             "email": user.email,
             "is_admin": user.is_admin
         }
@@ -101,8 +111,8 @@ def update_user(db: Session, user_id: int, user_data: user_schema.UserUpdate):
     db_user = get_user_by_id(db, user_id)
     
     # Cập nhật thông tin
-    if user_data.name is not None:
-        db_user.name = user_data.name
+    if user_data.username is not None:
+        db_user.name = user_data.username
     if user_data.email is not None:
         db_user.email = user_data.email
     if user_data.password is not None:
@@ -110,4 +120,14 @@ def update_user(db: Session, user_id: int, user_data: user_schema.UserUpdate):
     
     db.commit()
     db.refresh(db_user)
-    return db_user 
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    user_dict = {
+        "id": db_user.id,
+        "username": db_user.name,
+        "email": db_user.email,
+        "is_admin": db_user.is_admin,
+        "email_verified_at": db_user.email_verified_at
+    }
+    
+    return user_dict 
