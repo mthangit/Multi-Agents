@@ -35,7 +35,6 @@ def get_products(
         search=search,
         min_price=min_price,
         max_price=max_price,
-        sort_by=sort_by
     )
     return {"products": products, "total": len(products)}
 
