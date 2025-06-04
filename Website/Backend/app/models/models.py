@@ -1,5 +1,5 @@
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Float, DateTime, Text, cast
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, foreign
 from sqlalchemy.sql import func
 from app.database.database import Base
 
@@ -72,10 +72,7 @@ class Product(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Relationships - sử dụng viewonly=True vì không có foreign key constraint thực tế
-    cart_details = relationship("CartDetail", back_populates="product", viewonly=True)
-    invoice_details = relationship("InvoiceDetail", back_populates="product", viewonly=True)
-    wishlist_details = relationship("WishlistDetail", back_populates="product", viewonly=True)
+    # Loại bỏ các mối quan hệ ngược từ Product để tránh lỗi
 
 
 class Cart(Base):
@@ -103,7 +100,7 @@ class CartDetail(Base):
 
     # Relationships
     cart = relationship("Cart", back_populates="cart_details")
-    product = relationship("Product", foreign_keys=[product_id], primaryjoin="cast(CartDetail.product_id, Integer) == Product.id", back_populates="cart_details")
+    product = relationship("Product", primaryjoin="and_(foreign(CartDetail.product_id) == cast(Product.id, String))")
 
 
 class Invoice(Base):
@@ -140,7 +137,7 @@ class InvoiceDetail(Base):
 
     # Relationships
     invoice = relationship("Invoice", back_populates="invoice_details")
-    product = relationship("Product", foreign_keys=[product_id], primaryjoin="cast(InvoiceDetail.product_id, Integer) == Product.id", back_populates="invoice_details")
+    product = relationship("Product", primaryjoin="and_(foreign(InvoiceDetail.product_id) == cast(Product.id, String))")
 
 
 class Wishlist(Base):
@@ -166,4 +163,4 @@ class WishlistDetail(Base):
 
     # Relationships
     wishlist = relationship("Wishlist", back_populates="wishlist_details")
-    product = relationship("Product", foreign_keys=[product_id], primaryjoin="cast(WishlistDetail.product_id, Integer) == Product.id", back_populates="wishlist_details") 
+    product = relationship("Product", primaryjoin="and_(foreign(WishlistDetail.product_id) == cast(Product.id, String))") 
