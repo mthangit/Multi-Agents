@@ -33,12 +33,25 @@ app = FastAPI(
 )
 
 # Cấu hình CORS
+origins = [
+    "http://localhost",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://localhost:8080",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8080",
+    "https://eyevishop.onrender.com"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Trong môi trường production, hãy chỉ định domain cụ thể
+    allow_origins=origins,  # Liệt kê các nguồn được phép
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["X-Process-Time", "Content-Type", "Content-Length", "Accept", "Authorization"],
+    max_age=600,  # Thời gian cache preflight request (10 phút)
 )
 
 
