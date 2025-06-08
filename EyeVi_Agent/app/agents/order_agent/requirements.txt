@@ -1,26 +1,24 @@
+# A2A SDK
+a2a-sdk
+
+# LangChain and LangGraph
+langchain
+langgraph
+langchain-google-genai
+
+# FastAPI for additional API endpoints
 fastapi
 uvicorn
-mysql-connector-python
-pydantic
-pydantic-settings
-langchain
-langchain-google-genai
-langgraph
+
+# Database (if needed)
+sqlalchemy
+psycopg2-binary
+
+# Other utilities
 python-dotenv
-google-generativeai
-typing-extensions
-pytest
-httpx
-sse-starlette
-google-auth
-google-auth-oauthlib
-google-auth-httplib2
-redis
-aioredis
-websockets
-aiofiles
-jsonschema
-# CLI enhancements
-colorama
-rich
 click
+httpx
+pydantic
+
+# Logging and monitoring
+structlog
