@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, TypedDict, Any
 from pydantic import BaseModel, Field
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, ToolMessage
 
 
 class ChatState(TypedDict):
@@ -8,9 +9,17 @@ class ChatState(TypedDict):
     # Input message
     message: str
     
+    # Message history với ToolMessage và AIMessage
+    messages: List[BaseMessage]
+    
     # Intent and parameters
     intent: Optional[str]
     parameters: Optional[Dict[str, Any]]
+    
+    # Tool call results
+    tool_call_id: Optional[str]
+    tool_name: Optional[str]
+    tool_result: Optional[Any]
     
     # Data results
     product: Optional[Dict]
@@ -36,8 +45,12 @@ def initial_state() -> ChatState:
     """Create an empty initial state"""
     return {
         "message": "",
+        "messages": [],
         "intent": None,
         "parameters": None,
+        "tool_call_id": None,
+        "tool_name": None,
+        "tool_result": None,
         "product": None,
         "products": None,
         "order_id": None,

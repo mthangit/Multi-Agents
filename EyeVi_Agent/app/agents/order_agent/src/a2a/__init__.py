@@ -1,1 +1,1 @@
-# Agent-to-Agent (A2A) Communication Package 
+"""A2A integration package for the Order Management Agent.""" 
