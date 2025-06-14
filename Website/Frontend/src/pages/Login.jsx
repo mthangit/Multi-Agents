@@ -5,6 +5,8 @@ import bannerHero from "../assets/bannerHero.jpg";
 import { Logo } from "../components";
 import { useAuthContext } from "../contexts";
 import api from "../utils/axios-config"; // Import tệp axios-config.js đã cấu hình
+import axios from "axios";
+import { notify } from "../utils/utils";
 
 const Login = () => {
   const { loginHandler, token, loggingIn, userInfo } = useAuthContext();
@@ -31,29 +33,62 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Sử dụng Axios để gửi yêu cầu đăng nhập đến backend
-      const response = await api.post(
-        "http://localhost:8000/api/login",
+      // 1. Gọi API login để lấy thông tin người dùng
+      const userResponse = await api.post(
+        "http://34.87.90.190:8000/api/login",
         loginCredentials
       );
-      loginHandler(loginCredentials);
-      // Xử lý kết quả trả về từ backend
-      if (response.status === 200) {
-        // Lưu trữ token trong localStorage sau khi đăng nhập thành công
-        localStorage.setItem("token", response.data.access_token);
-        localStorage.setItem(
-          "userInfo",
-          JSON.stringify(response?.data?.foundUser)
-        );
-        // Kiểm tra nếu là admin thì chuyển hướng tới trang admin
-        if (response?.data?.foundUser?.is_admin === 1) {
+      
+      if (userResponse.status !== 200) {
+        notify("error", "Đăng nhập thất bại!");
+        return;
+      }
+      
+      const userData = userResponse.data;
+      
+      // 2. Gọi API token để lấy token xác thực
+      // API token yêu cầu dữ liệu dưới dạng form-urlencoded với username và password
+      const formData = new FormData();
+      formData.append('username', loginCredentials.email); // username là email
+      formData.append('password', loginCredentials.password);
+      
+      const tokenResponse = await axios.post(
+        "http://34.87.90.190:8000/api/token",
+        formData,
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+        }
+      );
+      
+      if (tokenResponse.status === 200) {
+        // Kết hợp thông tin từ cả hai API
+        const combinedData = {
+          encodedToken: tokenResponse.data.access_token,
+          foundUser: userData.foundUser
+        };
+        
+        // Lưu token và thông tin người dùng vào localStorage
+        localStorage.setItem("token", tokenResponse.data.access_token);
+        localStorage.setItem("userInfo", JSON.stringify(userData.foundUser));
+        
+        // Gọi loginHandler để cập nhật trạng thái trong context
+        loginHandler(combinedData);
+        
+        // Thông báo đăng nhập thành công
+        notify("success", "Đăng nhập thành công!");
+        
+        // Chuyển hướng người dùng
+        if (userData.foundUser.is_admin === true) {
           navigate("/adminproduct");
           return;
         }
         navigate("/");
       }
     } catch (error) {
-      console.error(error);
+      console.error("Lỗi đăng nhập:", error);
+      notify("error", "Đăng nhập thất bại! Vui lòng kiểm tra email và mật khẩu.");
     }
   };
 
@@ -113,16 +148,17 @@ const Login = () => {
                   {loggingIn ? "Đang đăng nhập..." : "Đăng nhập"}
                 </button>
                 <button
+                  type="button"
                   className="btn-secondary w-2/3 text-sm md:text-base text-center"
                   onClick={() => {
                     setLoginCredentials({
                       ...loginCredentials,
-                      email: "GuestIS207.O13@gmail.com",
-                      password: "IS207O13",
+                      email: "duong@example.com",
+                      password: "duong2003",
                     });
                   }}
                 >
-                  Đăng nhập với khách
+                  Đăng nhập với tài khoản mẫu
                 </button>
                 <Link to="/signup" className="underline text-gray-600">
                   Đăng ký tài khoản

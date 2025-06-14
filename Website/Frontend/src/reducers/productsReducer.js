@@ -15,13 +15,13 @@ export const initialState = {
   },
   addressList: [
     {
-      id: "61bf1558-94c3-4494-a522-0aad46ed5334",
-      fullname: "Jeon Jungkook",
-      mobile: "0637291830",
-      flat: "42, Yongsan Trade Center, Yongsan ",
-      area: "Hangang-daero",
+      name: "Jeon Jungkook",
+      phone: "0637291830",
+      address: "42, Yongsan Trade Center, Yongsan ",
+      country: "Hangang-daero",
       city: "Seoul",
-      pincode: "04322",
+      is_default: false,
+      state: "active"
     },
   ],
 };

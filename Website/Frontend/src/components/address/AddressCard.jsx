@@ -8,13 +8,13 @@ const AddressCard = ({
   setEditAddress,
   setShowAddressForm,
 }) => {
-  const { id, fullname, mobile, flat, area, city, pincode } = address;
+  const { id, name, phone, address: addressLine, city, country, is_default } = address;
   const { currentAddress, setCurrentAddress, updateAddress, deleteAddress } =
     useProductsContext();
   return (
     <label
       className={`flex ${
-        id === currentAddress.id && isEdit ? "bg-gray-100" : "bg-gray-50"
+        id === currentAddress?.id && isEdit ? "bg-gray-100" : "bg-gray-50"
       }  items-center gap-2 shadow-sm p-4 rounded-sm cursor-pointer`}
     >
       {showInput && (
@@ -23,22 +23,25 @@ const AddressCard = ({
           name="address"
           id=""
           className="accent-current me-2"
-          checked={id === currentAddress.id}
+          checked={id === currentAddress?.id}
           onChange={() => setCurrentAddress(address)}
         />
       )}
       <div>
-        <h3 className="text-lg font-semibold break-all">{fullname}</h3>
+        <h3 className="text-lg font-semibold break-all">{name}</h3>
         <p className="text-sm text-gray-500 break-all">
-          {flat},{area}
+          {addressLine}
         </p>
         <p className="text-sm text-gray-500 break-all">
-          {city},{pincode}
+          {city}, {country}
         </p>
         <p className="text-sm text-gray-500">
           Số điện thoại:
-          <span className="font-semibold ps-1 break-all">{mobile}</span>
+          <span className="font-semibold ps-1 break-all">{phone}</span>
         </p>
+        {is_default && (
+          <p className="text-sm text-green-600 font-semibold">Địa chỉ mặc định</p>
+        )}
         {isEdit && (
           <div className="flex gap-3 py-2">
             <button

@@ -44,23 +44,31 @@ const AuthContextProvider = ({ children }) => {
     }
   };
 
-  const loginHandler = async ({ email = "", password = "" }) => {
+  const loginHandler = async (data) => {
     setLoggingIn(true);
     try {
+      // Nếu data là đối tượng response từ API, xử lý trực tiếp
+      if (data?.encodedToken && data?.foundUser) {
+        localStorage.setItem("token", data.encodedToken);
+        localStorage.setItem("userInfo", JSON.stringify(data.foundUser));
+        setToken(data.encodedToken);
+        setUserInfo(data.foundUser);
+        notify("success", "Đăng nhập thành công!!");
+        return;
+      }
+      
+      // Nếu data là thông tin đăng nhập, gọi API
+      const { email = "", password = "" } = data;
       const response = await loginService(email, password);
-      console.log({ response });
+      
       if (response.status === 200 || response.status === 201) {
-        localStorage.setItem("token", response?.data?.encodedToken); // Sử dụng plainTextToken thay vì accessToken
+        localStorage.setItem("token", response?.data?.encodedToken);
         localStorage.setItem(
           "userInfo",
           JSON.stringify(response?.data?.foundUser)
         );
-        // if (response?.data?.foundUser?.is_admin === 1) {
-        //   navigate("/adminproduct");
-        //   return;
-        // }
-        // navigate("/");
         setToken(response?.data?.encodedToken);
+        setUserInfo(response?.data?.foundUser);
         notify("success", "Đăng nhập thành công!!");
       } else if (response.status === 401) {
         notify("error", "Có lỗi khi đăng nhập!!");
@@ -71,7 +79,7 @@ const AuthContextProvider = ({ children }) => {
         "error",
         err?.response?.data?.errors
           ? err?.response?.data?.errors[0]
-          : "Some Error Occurred!!"
+          : "Có lỗi xảy ra khi đăng nhập!"
       );
     } finally {
       setLoggingIn(false);
@@ -79,9 +87,15 @@ const AuthContextProvider = ({ children }) => {
   };
 
   const logoutHandler = () => {
+    // Xóa token và thông tin người dùng khỏi localStorage
     localStorage.removeItem("token");
     localStorage.removeItem("userInfo");
+    
+    // Cập nhật state
     setToken(null);
+    setUserInfo(null);
+    
+    // Thông báo đăng xuất thành công
     notify("info", "Đăng xuất thành công!!", 100);
   };
   return (
