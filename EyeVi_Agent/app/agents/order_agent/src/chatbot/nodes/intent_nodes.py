@@ -167,71 +167,104 @@ def extract_product_name_from_message(message):
 
 def intent_classification_node(state):
     """Node phân tích và xác định intent từ message của user"""
-    message = state["message"]
+    message = state.get("message", "")
     logger.info(f"Intent classification for message: '{message}'")
     
-    # Format prompt với message
-    prompt = INTENT_CLASSIFICATION_PROMPT.format(message=message)
-    logger.debug(f"Intent classification prompt: {prompt}")
+    if not message:
+        logger.warning("No message found in state")
+        return {"intent": "unknown"}
     
-    # Gọi LLM để nhận intent
-    intent = llm.invoke(prompt).content.strip().lower()
-    logger.info(f"Classified intent: '{intent}'")
-    
-    # Cập nhật state với intent
-    return {"intent": intent}
+    try:
+        # Format prompt với message
+        prompt = INTENT_CLASSIFICATION_PROMPT.format(message=message)
+        logger.debug(f"Intent classification prompt: {prompt}")
+        
+        # Gọi LLM để nhận intent
+        intent = llm.invoke(prompt).content.strip().lower()
+        logger.info(f"Classified intent: '{intent}'")
+        
+        # Cập nhật state với intent
+        return {"intent": intent}
+    except Exception as e:
+        logger.error(f"Error in intent classification: {e}")
+        return {"intent": "unknown"}
 
 def parameter_extraction_node(state):
     """Node trích xuất tham số từ message dựa trên intent đã xác định"""
-    message = state["message"]
-    intent = state["intent"]
+    message = state.get("message", "")
+    intent = state.get("intent", "unknown")
     logger.info(f"Parameter extraction for intent: '{intent}'")
     
-    # Format prompt với message và intent
-    prompt = PARAMETER_EXTRACTION_PROMPT.format(message=message, intent=intent)
-    logger.debug(f"Parameter extraction prompt: {prompt}")
+    if not message or intent == "unknown":
+        logger.warning(f"Invalid state for parameter extraction - message: '{message}', intent: '{intent}'")
+        return {"parameters": {}}
     
-    # Gọi LLM để trích xuất tham số
-    result = llm.invoke(prompt).content
-    logger.debug(f"Raw parameter extraction result: {result}")
-    
-    # Xử lý kết quả bằng hàm chuyên biệt
-    parameters = process_llm_json_output(result, intent, message)
-    logger.info(f"Final extracted parameters: {parameters}")
-    
-    return {"parameters": parameters}
+    try:
+        # Format prompt với message và intent
+        prompt = PARAMETER_EXTRACTION_PROMPT.format(message=message, intent=intent)
+        logger.debug(f"Parameter extraction prompt: {prompt}")
+        
+        # Gọi LLM để trích xuất tham số
+        result = llm.invoke(prompt).content
+        logger.debug(f"Raw parameter extraction result: {result}")
+        
+        # Xử lý kết quả bằng hàm chuyên biệt
+        parameters = process_llm_json_output(result, intent, message)
+        logger.info(f"Final extracted parameters: {parameters}")
+        
+        return {"parameters": parameters}
+    except Exception as e:
+        logger.error(f"Error in parameter extraction: {e}")
+        return {"parameters": {}}
 
 def generate_response_node(state):
     """Node tạo câu trả lời cuối cùng từ kết quả xử lý"""
-    message = state["message"]
-    intent = state["intent"]
+    message = state.get("message", "")
+    intent = state.get("intent", "unknown")
     logger.info(f"Generating response for intent: '{intent}'")
     
-    # Tạo result dict từ các trường dữ liệu trong state
-    result = {}
-    if state.get("product"):
-        result["product"] = state["product"]
-    if state.get("products"):
-        result["products"] = state["products"]
-    if state.get("order_id"):
-        result["order_id"] = state["order_id"]
-    if state.get("order"):
-        result["order"] = state["order"]
-    if state.get("error"):
-        result["error"] = state["error"]
-    
-    logger.debug(f"Response generation with result data: {result}")
-    
-    # Format prompt với message, intent và result
-    prompt = RESPONSE_GENERATION_PROMPT.format(
-        message=message,
-        intent=intent,
-        result=result
-    )
-    
-    # Gọi LLM để tạo câu trả lời
-    response = llm.invoke(prompt).content
-    logger.info(f"Generated response: '{response[:50]}...'")
-    
-    # Cập nhật state với response
-    return {"response": response} 
+    try:
+        # Tạo result dict từ các trường dữ liệu trong state
+        result = {}
+        if state.get("product"):
+            result["product"] = state["product"]
+        if state.get("products"):
+            result["products"] = state["products"]
+        if state.get("order_id"):
+            result["order_id"] = state["order_id"]
+        if state.get("order"):
+            result["order"] = state["order"]
+        if state.get("error"):
+            result["error"] = state["error"]
+        
+        logger.debug(f"Response generation with result data: {result}")
+        
+        # Format prompt với message, intent và result
+        prompt = RESPONSE_GENERATION_PROMPT.format(
+            message=message,
+            intent=intent,
+            result=result
+        )
+        
+        # Gọi LLM để tạo câu trả lời
+        response = llm.invoke(prompt).content
+        logger.info(f"Generated response: '{response[:50]}...'")
+        
+        # Thêm response vào messages và cập nhật state
+        from langchain_core.messages import AIMessage
+        new_messages = state.get("messages", []) + [AIMessage(content=response)]
+        
+        return {
+            "response": response,
+            "messages": new_messages
+        }
+    except Exception as e:
+        logger.error(f"Error in response generation: {e}")
+        error_response = "Xin lỗi, đã xảy ra lỗi khi xử lý yêu cầu của bạn."
+        from langchain_core.messages import AIMessage
+        new_messages = state.get("messages", []) + [AIMessage(content=error_response)]
+        
+        return {
+            "response": error_response,
+            "messages": new_messages
+        } 
