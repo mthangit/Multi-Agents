@@ -62,9 +62,9 @@ class QdrantManager:
                     vector=doc["embedding"],
                     payload={
                         "content": doc["content"],
-                        "source": doc["metadata"]["source"],
-                        "chunk_id": doc["metadata"]["chunk_id"],
-                        "total_chunks": doc["metadata"]["total_chunks"]
+                        "source": doc["source"],
+                        "chunk_id": doc["chunk_id"],
+                        "total_chunks": doc["total_chunks"]
                     }
                 )
                 points.append(point)
