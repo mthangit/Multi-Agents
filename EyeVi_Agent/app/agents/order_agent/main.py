@@ -17,7 +17,7 @@ from a2a.types import (
 from dotenv import load_dotenv
 
 from src.chatbot.simplified_bot import simplified_chatbot_instance
-from src.a2a.agent_executor import OrderAgentExecutor
+from src.a2a_wrapper.agent_executor import OrderAgentExecutor
 from src.database import initialize_database_connections
 
 load_dotenv()
