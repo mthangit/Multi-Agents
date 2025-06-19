@@ -104,8 +104,8 @@ async def demo_text_search():
     """Demo text search queries for testing the search agent."""
     
     demo_questions = [
-        "Tìm kính cận thị cho nam",
-        "Kính râm thể thao màu đen",
+        "Tìm kính mát GUCCI cho nam",
+        "Kính mát thể thao màu đen",
         "Gọng vuông titan cho khuôn mặt tròn",
         "Kính chống ánh sáng xanh cho dân văn phòng",
         "Kính thời trang nữ màu hồng"
