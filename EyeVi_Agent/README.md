@@ -40,8 +40,8 @@ GOOGLE_API_KEY=your_google_api_key_here
 QDRANT_HOST=localhost
 QDRANT_PORT=6333
 VECTOR_SIZE=512
-TEXT_COLLECTION_NAME=product_texts
-IMAGE_COLLECTION_NAME=product_images
+TEXT_COLLECTION_NAME=text_products
+IMAGE_COLLECTION_NAME=image_products
 ```
 
 ## Khởi chạy

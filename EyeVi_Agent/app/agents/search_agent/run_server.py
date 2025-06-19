@@ -9,11 +9,18 @@ import logging
 import base64
 import uvicorn
 import httpx
+import sys
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, File, Form, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
+
+# Thêm thư mục app vào sys.path để có thể import từ các module khác
+current_dir = os.path.dirname(os.path.abspath(__file__))
+app_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+if app_dir not in sys.path:
+    sys.path.append(app_dir)
 
 # A2A imports
 from a2a.server.apps import A2AStarletteApplication
@@ -25,6 +32,7 @@ from a2a.types import (
     AgentSkill,
 )
 
+# Import từ module app
 from .agent import SearchAgent
 from .a2a_wrapper.a2a_agent_executor import SearchAgentExecutor
 

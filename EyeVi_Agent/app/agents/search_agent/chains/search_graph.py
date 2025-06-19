@@ -62,7 +62,7 @@ class SearchChain:
             
         self.embed_query = get_embed_query_node(custom_model_path=custom_model_path)
         self.semantic_search = get_semantic_search_node(
-            qdrant_host="localhost",  # Cố định localhost
+            qdrant_host="http://eyevi.devsecopstech.click",  # Cố định localhost
             qdrant_port=qdrant_port
         )
         self.format_response = get_format_response_node()

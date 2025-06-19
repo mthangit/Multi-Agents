@@ -46,25 +46,33 @@ export default function Home() {
     };
     
     setMessages(prev => [...prev, userMessage]);
-    
+    console.log("content: ", content)
     try {
       // Chuẩn bị FormData cho API
-      const formData = new FormData();
-      formData.append("message", content);
+      // const formData = new FormData();
+      // formData.append("message", content);
       
-      // Thêm tệp đính kèm vào FormData nếu có
-      if (attachments && attachments.length > 0) {
-        attachments.forEach(file => {
-          formData.append("attachments", file);
-        });
-      }
+      // // Thêm tệp đính kèm vào FormData nếu có
+      // if (attachments && attachments.length > 0) {
+      //   attachments.forEach(file => {
+      //     formData.append("attachments", file);
+      //   });
+      // }
       
-      // Gửi yêu cầu đến API chatbot
-      const response = await fetch("http://your-backend-api-url/chat", {
+      // // Gửi yêu cầu đến API chatbot
+      // const response = await fetch("http://localhost:8001/search/text", {
+      //   method: "POST",
+      //   body: formData,
+      // });
+      const response = await fetch("http://localhost:8001/search/text", {
         method: "POST",
-        body: formData,
+        body: JSON.stringify({
+          query: content
+        }),
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
-      
       if (!response.ok) {
         throw new Error("Lỗi khi gửi tin nhắn");
       }

@@ -22,7 +22,7 @@ class ProductSearch:
 
     def __init__(
         self,
-        qdrant_host="localhost",
+        qdrant_host="http://eyevi.devsecopstech.click",
         qdrant_port=6333,
         model_name="openai/clip-vit-base-patch32",
         default_limit=5,
@@ -214,7 +214,7 @@ class ProductSearch:
 
         # Thực hiện tìm kiếm
         search_results = self.qdrant_client.search(
-            collection_name="product_images",
+            collection_name="image_products",
             query_vector=image_vector.tolist(),
             limit=limit,
             query_filter=search_filter
@@ -269,7 +269,7 @@ class ProductSearch:
         # Thực hiện tìm kiếm
         try:
             search_results = self.qdrant_client.search(
-                collection_name="product_texts",
+                collection_name="text_products",
                 query_vector=text_vector.tolist(),
                 limit=limit,
                 query_filter=search_filter
@@ -341,7 +341,7 @@ class ProductSearch:
 
                 # Lấy kết quả tìm kiếm ảnh với score
                 image_results = self.qdrant_client.search(
-                    collection_name="product_images",
+                    collection_name="image_products",
                     query_vector=image_vector.tolist(),
                     limit=limit * 3,  # Tăng limit để có nhiều kết quả hơn
                     query_filter=search_filter,
@@ -371,7 +371,7 @@ class ProductSearch:
 
                 # Lấy kết quả tìm kiếm text với score
                 text_results = self.qdrant_client.search(
-                    collection_name="product_texts",
+                    collection_name="text_products",
                     query_vector=text_vector.tolist(),
                     limit=limit * 3,
                     query_filter=search_filter,
