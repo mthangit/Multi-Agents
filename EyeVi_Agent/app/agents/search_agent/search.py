@@ -78,7 +78,7 @@ class ProductSearch:
 
         # Thực hiện tìm kiếm
         search_results = self.qdrant_client.search(
-            collection_name="product_images",
+            collection_name="image_products",
             query_vector=image_vector.tolist(),
             limit=limit,
             query_filter=search_filter
@@ -105,7 +105,7 @@ class ProductSearch:
         print("search_filter: ", search_filter)
         # Thực hiện tìm kiếm
         search_results = self.qdrant_client.search(
-            collection_name="product_texts",
+            collection_name="text_products",
             query_vector=text_vector.tolist(),
             limit=limit,
             query_filter=search_filter
@@ -138,7 +138,7 @@ class ProductSearch:
         if image:
             # Lấy kết quả tìm kiếm ảnh với score
             image_results = self.qdrant_client.search(
-                collection_name="product_images",
+                collection_name="image_products",
                 query_vector=self.process_image(image).tolist(),
                 limit=limit * 3,  # Tăng limit để có nhiều kết quả hơn cho việc kết hợp
                 query_filter=None if not filter_params else Filter(
@@ -159,7 +159,7 @@ class ProductSearch:
         if text:
             # Lấy kết quả tìm kiếm text với score
             text_results = self.qdrant_client.search(
-                collection_name="product_texts",
+                collection_name="text_products",
                 query_vector=self.process_text(text).tolist(),
                 limit=limit * 3,
                 query_filter=None if not filter_params else Filter(

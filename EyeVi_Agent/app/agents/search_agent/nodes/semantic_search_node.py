@@ -29,8 +29,8 @@ class SemanticSearchNode:
             default_limit: Số lượng kết quả mặc định trả về
         """
         try:
-            self.qdrant_client = QdrantClient("localhost", port=qdrant_port)
-            logger.info(f"Đã kết nối đến Qdrant tại {"localhost"}:{qdrant_port}")
+            self.qdrant_client = QdrantClient("http://eyevi.devsecopstech.click", port=qdrant_port)
+            logger.info(f"Đã kết nối đến Qdrant tại {"http://eyevi.devsecopstech.click"}:{qdrant_port}")
         except Exception as e:
             logger.error(f"Lỗi khi kết nối đến Qdrant: {e}")
             raise
@@ -204,13 +204,13 @@ class SemanticSearchNode:
         """
         logger.info(json.dumps(filter_params.dict(), indent=2))
         search_results = self.qdrant_client.search(
-            collection_name="product_texts",
+            collection_name="text_products",
             query_vector=text_embedding,
             limit=limit,
             query_filter=filter_params
         )
         
-        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'product_texts'")
+        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'text_products'")
         return [hit.payload for hit in search_results]
     
     def _search_by_image(
@@ -231,13 +231,13 @@ class SemanticSearchNode:
             Danh sách kết quả tìm kiếm
         """
         search_results = self.qdrant_client.search(
-            collection_name="product_images",
+            collection_name="image_products",
             query_vector=image_embedding,
             limit=limit,
             query_filter=filter_params
         )
         
-        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'product_images'")
+        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'image_products'")
         return [hit.payload for hit in search_results]
     
     def _search_combined(
@@ -270,7 +270,7 @@ class SemanticSearchNode:
     
         # Tìm kiếm bằng text
         text_results = self.qdrant_client.search(
-            collection_name="product_texts",
+            collection_name="text_products",
             query_vector=text_embedding,
             limit=limit * 3,  # Tăng limit để có nhiều kết quả hơn
             query_filter=filter_params,
@@ -278,7 +278,7 @@ class SemanticSearchNode:
             score_threshold=0.0
         )
         
-        logger.info(f"Tìm thấy {len(text_results)} kết quả text từ collection 'product_texts'")
+        logger.info(f"Tìm thấy {len(text_results)} kết quả text từ collection 'text_products'")
         
         # Cộng điểm từ kết quả text (có trọng số)
         for hit in text_results:
@@ -289,9 +289,9 @@ class SemanticSearchNode:
                     product_details[product_id] = hit.payload
         
         # Tìm kiếm bằng image
-        logger.info(f"Tìm kiếm image trong collection 'product_images' với limit={limit*3}")
+        logger.info(f"Tìm kiếm image trong collection 'image_products' với limit={limit*3}")
         image_results = self.qdrant_client.search(
-            collection_name="product_images",
+            collection_name="image_products",
             query_vector=image_embedding,
             limit=limit * 3,
             query_filter=filter_params,
@@ -299,7 +299,7 @@ class SemanticSearchNode:
             score_threshold=0.0
         )
         
-        logger.info(f"Tìm thấy {len(image_results)} kết quả image từ collection 'product_images'")
+        logger.info(f"Tìm thấy {len(image_results)} kết quả image từ collection 'image_products'")
         
         # Cộng điểm từ kết quả image (có trọng số)
         for hit in image_results:

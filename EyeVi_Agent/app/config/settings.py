@@ -18,8 +18,8 @@ MODEL_NAME = os.getenv("MODEL_NAME", "gemini-2.0-flash")
 QDRANT_HOST = os.getenv("QDRANT_HOST", "localhost")
 QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6333))
 VECTOR_SIZE = int(os.getenv("VECTOR_SIZE", 512))
-TEXT_COLLECTION_NAME = os.getenv("TEXT_COLLECTION_NAME", "product_texts")
-IMAGE_COLLECTION_NAME = os.getenv("IMAGE_COLLECTION_NAME", "product_images")
+TEXT_COLLECTION_NAME = os.getenv("TEXT_COLLECTION_NAME", "text_products")
+IMAGE_COLLECTION_NAME = os.getenv("IMAGE_COLLECTION_NAME", "image_products")
 
 # Cấu hình Tìm kiếm
 SEARCH_LIMIT = int(os.getenv("SEARCH_LIMIT", 5))  # Số lượng kết quả tìm kiếm từ vector database
