@@ -5,66 +5,168 @@ A2A Client for testing Advisor Agent
 
 import asyncio
 import sys
-from typing import Optional
+from typing import Optional, Any
+import httpx
+from uuid import uuid4
 
-from a2a.client import A2AClient
-from a2a.types import SendMessageRequest
+from a2a.client import A2AClient, A2ACardResolver
+from a2a.types import SendMessageRequest, SendStreamingMessageRequest, MessageSendParams
 
 
 class AdvisorAgentClient:
     """Client for interacting with Advisor Agent via A2A protocol."""
     
-    def __init__(self, agent_url: str = "http://localhost:10001"):
-        self.agent_url = agent_url
-        self.client = A2AClient(agent_url)
-    
+    def __init__(self, base_url: str = "http://localhost:10001"):
+        self.base_url = base_url
+        self.httpx_client = None
+        self.client = None
+        self.agent_card = None
+        self._initialized = False
+
+    async def initialize(self):
+        """Initialize the A2A client with proper agent card."""
+        if self._initialized:
+            return
+            
+        print(f"🔄 Connecting to agent at: {self.base_url}")
+        self.httpx_client = httpx.AsyncClient()
+        
+        # Initialize A2ACardResolver to fetch agent card
+        resolver = A2ACardResolver(
+            httpx_client=self.httpx_client,
+            base_url=self.base_url
+        )
+        
+        # Fetch agent card
+        self.agent_card = await resolver.get_agent_card()
+        
+        # Initialize A2A client with agent card
+        self.client = A2AClient(
+            httpx_client=self.httpx_client,
+            agent_card=self.agent_card
+        )
+        
+        # Display agent info immediately
+        print(f"✅ Connected to: {self.agent_card.name}")
+        print(f"📝 Description: {self.agent_card.description}")
+        print(f"🔗 URL: {self.agent_card.url}")
+        if hasattr(self.agent_card, 'skills') and self.agent_card.skills:
+            print(f"🛠️ Available skills: {len(self.agent_card.skills)}")
+            for skill in self.agent_card.skills:
+                print(f"   - {skill.name}: {skill.description}")
+        else:
+            print("🛠️ No specific skills listed")
+        print("─" * 50)
+        
+        self._initialized = True
+
+    async def close(self):
+        """Close the httpx client."""
+        if self.httpx_client:
+            await self.httpx_client.aclose()
+
     async def send_message(self, message: str, stream: bool = False) -> dict:
         """Send a message to the advisor agent."""
-        try:
-            request = SendMessageRequest(
-                message=message,
-                stream=stream
+        if not self.client:
+            await self.initialize()
+            
+        # try:
+            # Prepare message payload according to A2A format
+        send_message_payload: dict[str, Any] = {
+            'message': {
+                'role': 'user',
+                'parts': [
+                    {'kind': 'text', 'text': message}
+                ],
+                'messageId': uuid4().hex,
+            },
+        }
+        
+        if stream:
+            print(f"🔄 Streaming request to advisor agent...")
+            
+            # Create streaming request
+            streaming_request = SendStreamingMessageRequest(
+                id=str(uuid4()),
+                params=MessageSendParams(**send_message_payload)
             )
             
-            if stream:
-                print(f"🔄 Streaming request to advisor agent...")
-                result_parts = []
-                async for event in self.client.send_message_stream(request):
-                    if hasattr(event, 'content'):
-                        print(f"📝 Update: {event.content}")
-                        result_parts.append(event.content)
-                    elif hasattr(event, 'task'):
-                        print(f"✅ Completed: {event.task.id}")
-                        return {
-                            "status": "success",
-                            "content": "\n".join(result_parts),
-                            "task_id": event.task.id
-                        }
-                        
-            else:
-                print(f"📨 Sending message to advisor agent...")
-                task = await self.client.send_message(request)
-                result = await self.client.wait_for_completion(task.id)
+            stream_response = self.client.send_message_streaming(streaming_request)
+            result_parts = []
+            
+            async for chunk in stream_response:
+                chunk_data = chunk.model_dump(mode='json', exclude_none=True)
+                print(f"📝 Chunk: {chunk_data}")
                 
-                return {
-                    "status": "success",
-                    "content": result.result if hasattr(result, 'result') else str(result),
-                    "task_id": task.id
-                }
-                
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e)
-            }
-    
-    async def get_agent_info(self) -> dict:
-        """Get agent card information."""
-        try:
-            agent_card = await self.client.get_agent_card()
+                # Extract content from chunk
+                if 'result' in chunk_data:
+                    result = chunk_data['result']
+                    if 'parts' in result:
+                        for part in result['parts']:
+                            if part.get('type') == 'text':
+                                result_parts.append(part.get('text', ''))
+            
             return {
                 "status": "success",
-                "agent_card": agent_card
+                "content": "\n".join(result_parts),
+                "task_id": streaming_request.id
+            }
+                    
+        else:
+            print(f"📨 Sending message to advisor agent...")
+            
+            # Create non-streaming request
+            request = SendMessageRequest(
+                id=str(uuid4()),
+                params=MessageSendParams(**send_message_payload)
+            )
+            
+            response = await self.client.send_message(request=request, http_kwargs={"timeout": None})
+            response_data = response.model_dump(mode='json', exclude_none=True)
+            
+            # Extract content from response
+            content = ""
+            if 'result' in response_data:
+                result = response_data['result']
+                if 'parts' in result:
+                    for part in result['parts']:
+                        if part.get('kind') == 'text':
+                            content += part.get('text', '')
+            
+            return {
+                "status": "success",
+                "content": content,
+                "task_id": request.id,
+                "raw_response": response_data
+            }
+                
+        # except Exception as e:
+        #     return {
+        #         "status": "error",
+        #         "error": str(e)
+        #     }
+
+    async def get_agent_info(self) -> dict:
+        """Get agent card information."""
+        if not self.client:
+            await self.initialize()
+            
+        try:
+            # Use the already fetched agent card
+            return {
+                "status": "success",
+                "agent_card": {
+                    "name": self.agent_card.name,
+                    "version": self.agent_card.version,
+                    "description": self.agent_card.description,
+                    "url": self.agent_card.url,
+                    "skills": [
+                        {
+                            "name": skill.name,
+                            "description": skill.description
+                        } for skill in self.agent_card.skills
+                    ] if hasattr(self.agent_card, 'skills') and self.agent_card.skills else []
+                }
             }
         except Exception as e:
             return {
@@ -84,63 +186,60 @@ async def demo_queries():
         "Chất liệu gọng titan có ưu điểm gì?"
     ]
     
-    client = AdvisorAgentClient()
-    
     print("=" * 60)
     print("🤖 DEMO: ADVISOR AGENT A2A CLIENT")
     print("=" * 60)
     
-    # Get agent information
-    print("\n📋 Getting agent information...")
-    agent_info = await client.get_agent_info()
-    if agent_info["status"] == "success":
-        card = agent_info["agent_card"]
-        print(f"✅ Agent: {card.name}")
-        print(f"📝 Description: {card.description}")
-        print(f"🛠️ Skills: {len(card.skills)} available")
-        for skill in card.skills:
-            print(f"   - {skill.name}: {skill.description}")
-    else:
-        print(f"❌ Failed to get agent info: {agent_info['error']}")
-        return
+    client = AdvisorAgentClient()
     
-    print(f"\n🎯 Testing with {len(demo_questions)} demo questions:")
-    
-    for i, question in enumerate(demo_questions, 1):
-        print(f"\n" + "─" * 50)
-        print(f"❓ [{i}] {question}")
-        print("─" * 50)
+    try:
+        # Initialize and fetch agent info automatically
+        await client.initialize()
         
-        # Send message
-        result = await client.send_message(question, stream=False)
+        print(f"\n🎯 Testing with {len(demo_questions)} demo questions:")
         
-        if result["status"] == "success":
-            print(f"🤖 Advisor Agent Response:")
-            print(result["content"])
-            print(f"\n📊 Task ID: {result['task_id']}")
-        else:
-            print(f"❌ Error: {result['error']}")
-        
-        # Small delay between requests
-        await asyncio.sleep(1)
+        for i, question in enumerate(demo_questions, 1):
+            print(f"\n" + "─" * 50)
+            print(f"❓ [{i}] {question}")
+            print("─" * 50)
+            
+            # Send message
+            result = await client.send_message(question, stream=False)
+            
+            if result["status"] == "success":
+                print(f"🤖 Advisor Agent Response:")
+                print(result["content"])
+                print(f"\n📊 Task ID: {result['task_id']}")
+            else:
+                print(f"❌ Error: {result['error']}")
+            
+            # Small delay between requests
+            await asyncio.sleep(1)
+            
+    finally:
+        await client.close()
 
 
 async def interactive_mode():
     """Interactive chat mode with advisor agent."""
-    client = AdvisorAgentClient()
-    
     print("=" * 60)
     print("💬 INTERACTIVE MODE: ADVISOR AGENT A2A")
     print("=" * 60)
-    print("Commands:")
+    
+    client = AdvisorAgentClient()
+    
+    # try:
+        # Initialize and fetch agent info automatically
+    await client.initialize()
+    
+    print("\nCommands:")
     print("  - 'exit' or 'quit': Exit")
     print("  - 'info': Show agent information")
     print("  - 'stream <message>': Send streaming message")
     print("  - Or type your eyewear question directly")
     print("─" * 60)
-    
     while True:
-        try:
+        # try:
             user_input = input("\n💬 Bạn: ").strip()
             
             if not user_input:
@@ -155,10 +254,10 @@ async def interactive_mode():
                 if agent_info["status"] == "success":
                     card = agent_info["agent_card"]
                     print(f"\n📋 Agent Information:")
-                    print(f"   Name: {card.name}")
-                    print(f"   Version: {card.version}")
-                    print(f"   URL: {card.url}")
-                    print(f"   Skills: {len(card.skills)}")
+                    print(f"   Name: {card['name']}")
+                    print(f"   Version: {card['version']}")
+                    print(f"   URL: {card['url']}")
+                    print(f"   Skills: {len(card['skills'])}")
                 else:
                     print(f"❌ Error getting agent info: {agent_info['error']}")
                     
@@ -179,12 +278,15 @@ async def interactive_mode():
                     print(result["content"])
                 else:
                     print(f"❌ Error: {result['error']}")
-                    
-        except KeyboardInterrupt:
-            print("\n👋 Tạm biệt!")
-            break
-        except Exception as e:
-            print(f"❌ Unexpected error: {e}")
+                        
+    #         except KeyboardInterrupt:
+    #             print("\n👋 Tạm biệt!")
+    #             break
+    #         except Exception as e:
+    #             print(f"❌ Unexpected error: {e}")
+                
+    # finally:
+    #     await client.close()
 
 
 async def main():
@@ -199,14 +301,18 @@ async def main():
             question = " ".join(sys.argv[1:])
             client = AdvisorAgentClient()
             
-            print(f"❓ Question: {question}")
-            result = await client.send_message(question)
-            
-            if result["status"] == "success":
-                print(f"\n🤖 Answer:")
-                print(result["content"])
-            else:
-                print(f"❌ Error: {result['error']}")
+            try:
+                await client.initialize()
+                print(f"\n❓ Question: {question}")
+                result = await client.send_message(question)
+                
+                if result["status"] == "success":
+                    print(f"\n🤖 Answer:")
+                    print(result["content"])
+                else:
+                    print(f"❌ Error: {result['error']}")
+            finally:
+                await client.close()
     else:
         # Default to interactive mode
         await interactive_mode()
