@@ -46,10 +46,11 @@ class SearchAgentExecutor(AgentExecutor):
         if not context.message:
             raise ValueError("RequestContext must have a message")
 
-        updater = TaskUpdater(event_queue, context.task_id, context.context_id)
-        if not context.current_task:
-            await updater.submit()
-        await updater.start_work()
+        task = context.current_task
+        if not task:
+            task = new_task(context.message)
+            await event_queue.enqueue_event(task)
+        updater = TaskUpdater(event_queue, task.id, task.contextId)
 
         try:
             # Get user input from context
@@ -67,6 +68,12 @@ class SearchAgentExecutor(AgentExecutor):
 
             # Update task status and complete
             await updater.add_artifact(parts, name="search_result")
+            await event_queue.enqueue_event(new_agent_text_message(
+                text=result,
+                context_id=context.context_id,
+                task_id=context.task_id,
+            ))
+            
             await updater.complete()
 
         except Exception as e:
