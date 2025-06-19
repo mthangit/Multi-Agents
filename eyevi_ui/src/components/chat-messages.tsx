@@ -61,36 +61,28 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
   };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 space-y-4">
+    <div className="flex-1 overflow-y-auto p-4 space-y-6">
       {messages.map((message) => (
         <div
           key={message.id}
           className={cn(
-            "flex items-start gap-2 max-w-[80%]",
-            message.sender === "user" ? "ml-auto" : "mr-auto"
+            "flex gap-4",
+            message.sender === "user" ? "justify-end" : "justify-start"
           )}
         >
-          <div
-            className={cn(
-              "min-w-10 h-10 rounded-full flex items-center justify-center",
-              message.sender === "user" 
-                ? "bg-primary text-primary-foreground order-last" 
-                : "bg-muted"
-            )}
-          >
-            {message.sender === "user" ? (
-              <User className="h-6 w-6" />
-            ) : (
+          {message.sender === "bot" && (
+            <div className="min-w-10 h-10 rounded-full flex items-center justify-center bg-muted">
               <Bot className="h-6 w-6" />
-            )}
-          </div>
-          <div className="flex flex-col gap-1">
+            </div>
+          )}
+          
+          <div className="flex flex-col gap-1 max-w-[80%]">
             <div
               className={cn(
-                "rounded-lg p-3",
+                "rounded-xl p-3",
                 message.sender === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
+                  ? "bg-primary text-primary-foreground rounded-tr-none"
+                  : "bg-muted rounded-tl-none"
               )}
             >
               <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -115,6 +107,12 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
               {formatTime(message.timestamp)}
             </span>
           </div>
+          
+          {message.sender === "user" && (
+            <div className="min-w-10 h-10 rounded-full flex items-center justify-center bg-primary text-primary-foreground">
+              <User className="h-6 w-6" />
+            </div>
+          )}
         </div>
       ))}
       <div ref={messagesEndRef} />
