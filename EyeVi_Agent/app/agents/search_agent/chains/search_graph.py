@@ -6,11 +6,11 @@ import logging
 from langgraph.graph import StateGraph, END
 
 
-from ..nodes.intent_classifier_node import get_intent_classifier_node
-from ..nodes.attribute_extraction_node import get_attribute_extraction_node
-from ..nodes.embed_query_node import get_embed_query_node
-from ..nodes.semantic_search_node import get_semantic_search_node
-from ..nodes.format_response_node import get_format_response_node
+from nodes.intent_classifier_node import get_intent_classifier_node
+from nodes.attribute_extraction_node import get_attribute_extraction_node
+from nodes.embed_query_node import get_embed_query_node
+from nodes.semantic_search_node import get_semantic_search_node
+from nodes.format_response_node import get_format_response_node
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)

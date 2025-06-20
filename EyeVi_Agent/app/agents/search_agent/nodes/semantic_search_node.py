@@ -5,7 +5,7 @@ import json
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from ..data.filter_constants import (AVAILABLE_BRANDS)
+from data.filter_constants import (AVAILABLE_BRANDS)
 
 # Cấu hình logging chi tiết hơn
 logging.basicConfig(level=logging.INFO)

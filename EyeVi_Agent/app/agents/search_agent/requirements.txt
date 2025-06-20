@@ -16,3 +16,4 @@ pillow>=10.0.0
 python-multipart>=0.0.9
 httpx>=0.26.0
 httpx-sse>=0.4.0 
+python-dotenv==1.1.0

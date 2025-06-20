@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional, List
 import base64
 from fastapi import HTTPException
 
-from .chains.search_graph import SearchChain
+from chains.search_graph import SearchChain
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
