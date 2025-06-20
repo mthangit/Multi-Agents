@@ -4,8 +4,8 @@ import json
 import traceback
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from ..prompts.search_prompts import EXTRACT_QUERY
-from ..data.filter_constants import (
+from prompts.search_prompts import EXTRACT_QUERY
+from data.filter_constants import (
     AVAILABLE_COLORS, AVAILABLE_BRANDS, AVAILABLE_FRAME_SHAPES,
     AVAILABLE_FRAME_MATERIALS, AVAILABLE_GENDERS, AVAILABLE_CATEGORIES,
     AVAILABLE_FACE_SIZES, COLOR_MAPPING, get_normalized_value

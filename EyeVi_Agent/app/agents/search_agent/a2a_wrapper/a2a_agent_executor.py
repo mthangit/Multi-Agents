@@ -23,7 +23,7 @@ from a2a.utils import (
 )
 from a2a.utils.errors import ServerError
 
-from ..agent import SearchAgent
+from agent.agent import SearchAgent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

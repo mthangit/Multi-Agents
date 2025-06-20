@@ -33,8 +33,8 @@ from a2a.types import (
 )
 
 # Import từ module app
-from .agent import SearchAgent
-from .a2a_wrapper.a2a_agent_executor import SearchAgentExecutor
+from agent.agent import SearchAgent
+from a2a_wrapper.a2a_agent_executor import SearchAgentExecutor
 
 # Load environment variables
 load_dotenv()
@@ -301,45 +301,24 @@ def start_server():
 
 if __name__ == "__main__":
     # Xử lý các tham số dòng lệnh
-    import argparse
+    logger.info(f"🚀 Starting Search Agent A2A server on localhost:10002")
+    logger.info(f"📋 Agent Card: http://localhost:10002/.well-known/agent.json")
+    logger.info(f"🔗 A2A Endpoint: http://localhost:10002/")
+    logger.info(f"🔍 Ready for product search queries!")
+    logger.info(f"🖼️  Supports: Text search, Image search, Multimodal search")
     
-    parser = argparse.ArgumentParser(description="Khởi động Search Agent API server")
-    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host để lắng nghe")
-    parser.add_argument("--port", type=int, default=8001, help="Port để lắng nghe")
-    parser.add_argument("--reload", action="store_true", help="Bật chế độ tự động reload")
-    parser.add_argument("--a2a", action="store_true", help="Chạy ở chế độ A2A thay vì FastAPI")
-    parser.add_argument("--skip-checks", action="store_true", help="Bỏ qua kiểm tra prerequisites")
-    
-    args = parser.parse_args()
-    
-    # Check prerequisites unless skipped
-    if not args.skip_checks:
-        check_prerequisites()
-    
-    if args.a2a:
-        # Chạy A2A server
-        logger.info(f"🚀 Starting Search Agent A2A server on {args.host}:{args.port}")
-        logger.info(f"📋 Agent Card: http://{args.host}:{args.port}/.well-known/agent.json")
-        logger.info(f"🔗 A2A Endpoint: http://{args.host}:{args.port}/")
-        logger.info(f"🔍 Ready for product search queries!")
-        logger.info(f"🖼️  Supports: Text search, Image search, Multimodal search")
+    a2a_server = create_a2a_server("localhost", 10002)
+    uvicorn.run(a2a_server.build(), host="localhost", port=10002)
         
-        a2a_server = create_a2a_server(args.host, args.port)
-        uvicorn.run(a2a_server.build(), host=args.host, port=args.port)
-    else:
-        # Chạy FastAPI server (default)
-        logger.info(f"🚀 Starting Search Agent FastAPI server on {args.host}:{args.port}")
-        logger.info(f"📋 API Docs: http://{args.host}:{args.port}/docs")
-        logger.info(f"🔗 API Endpoint: http://{args.host}:{args.port}/search")
         
-        # Lưu thông tin host và port vào môi trường
-        os.environ["SEARCH_AGENT_HOST"] = args.host
-        os.environ["SEARCH_AGENT_PORT"] = str(args.port)
+        # # Lưu thông tin host và port vào môi trường
+        # os.environ["SEARCH_AGENT_HOST"] = "localhost"
+        # os.environ["SEARCH_AGENT_PORT"] = str(10002)
         
-        # Khởi động FastAPI server với tham số từ dòng lệnh
-        uvicorn.run(
-            "app.agents.search_agent.run_server:app",
-            host=args.host,
-            port=args.port,
-            reload=args.reload
-        ) 
+        # # Khởi động FastAPI server với tham số từ dòng lệnh
+        # uvicorn.run(
+        #     "app.agents.search_agent.run_server:app",
+        #     host="localhost",
+        #     port=10002,
+        #     reload=False
+        # )
