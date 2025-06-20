@@ -112,7 +112,7 @@ class SemanticSearchNode:
         """
         if not attributes:
             return None
-        
+
         conditions = []
         
         # Lọc theo brand
@@ -135,7 +135,8 @@ class SemanticSearchNode:
             conditions.append(
                 FieldCondition(key="brand", match=MatchValue(value=brand_value))
             )
-        
+        else:
+            return None
         # # Lọc theo gender
         # if "gender" in attributes and attributes["gender"]:
         #     gender_value = attributes["gender"]
@@ -202,7 +203,12 @@ class SemanticSearchNode:
         Returns:
             Danh sách kết quả tìm kiếm
         """
-        logger.info(json.dumps(filter_params.dict(), indent=2))
+        # Kiểm tra filter_params trước khi gọi dict()
+        if filter_params:
+            logger.info(json.dumps(filter_params.dict(), indent=2))
+        else:
+            logger.info("Không có filter_params")
+            
         search_results = self.qdrant_client.search(
             collection_name="text_products",
             query_vector=text_embedding,
@@ -230,6 +236,12 @@ class SemanticSearchNode:
         Returns:
             Danh sách kết quả tìm kiếm
         """
+        # Kiểm tra filter_params trước khi sử dụng
+        if filter_params:
+            logger.info(json.dumps(filter_params.dict(), indent=2))
+        else:
+            logger.info("Không có filter_params cho tìm kiếm image")
+            
         search_results = self.qdrant_client.search(
             collection_name="image_products",
             query_vector=image_embedding,
@@ -264,6 +276,12 @@ class SemanticSearchNode:
             Danh sách kết quả tìm kiếm
         """
         from collections import defaultdict
+        
+        # Kiểm tra filter_params trước khi sử dụng
+        if filter_params:
+            logger.info(json.dumps(filter_params.dict(), indent=2))
+        else:
+            logger.info("Không có filter_params cho tìm kiếm combined")
         
         product_scores = defaultdict(float)
         product_details = {}
