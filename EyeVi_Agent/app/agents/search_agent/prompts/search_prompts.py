@@ -14,7 +14,7 @@ Hãy trả về chỉ duy nhất tên intent (không cần giải thích).
 """
 
 EXTRACT_QUERY = """
-Bạn là một trợ lý AI giúp chuẩn hóa truy vấn tìm kiếm kính mắt của người dùng.
+Hãy thực hiện chuẩn hóa câu truy vấn của người dùng. 
 
 Khi nhận được yêu cầu: {query}
 

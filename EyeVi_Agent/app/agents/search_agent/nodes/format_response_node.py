@@ -22,7 +22,7 @@ class FormatResponseNode:
             self.llm = ChatGoogleGenerativeAI(
                 model="gemini-2.0-flash",
                 google_api_key=self.api_key,
-                temperature=0.7,
+                temperature=0.5,
                 convert_system_message_to_human=True
             )
         else:
@@ -173,14 +173,15 @@ class FormatResponseNode:
             Sản phẩm {i}:
             - Mô tả: {product['description']}
             """
-            product_details.append(detail)
+            product_details.append(detail) 
         
         # Tạo thông tin về các thuộc tính được trích xuất
         attribute_details = []
         for key, value in extracted_attributes.items():
             if value and key != "recommended_shapes":
                 attribute_details.append(f"- {key}: {value}")
-        
+        logger.info(f"JSON được trích xuất: {extracted_attributes}")
+        logger.info(f"Các sản phẩm đã tìm được: {product_details}")
         # Tạo prompt
         prompt = f"""
         Câu hỏi của khách hàng: "{query}"
