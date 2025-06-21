@@ -8,6 +8,9 @@ import sys
 from typing import Optional, Any
 import httpx
 from uuid import uuid4
+import base64
+import os
+from pathlib import Path
 
 from a2a.client import A2AClient, A2ACardResolver
 from a2a.types import SendMessageRequest, SendStreamingMessageRequest, MessageSendParams
@@ -174,6 +177,128 @@ class AdvisorAgentClient:
                 "error": str(e)
             }
 
+    async def send_message_with_image(
+        self, 
+        message: str = "", 
+        image_path: Optional[str] = None, 
+        image_data: Optional[bytes] = None,
+        stream: bool = False
+    ) -> dict:
+        """Gửi tin nhắn kèm hình ảnh đến agent.
+        
+        Args:
+            message: Nội dung tin nhắn văn bản (có thể để trống nếu chỉ gửi ảnh)
+            image_path: Đường dẫn đến file ảnh (nếu có)
+            image_data: Dữ liệu ảnh dạng bytes (nếu không có image_path)
+            stream: Bật/tắt chế độ streaming
+            
+        Returns:
+            Kết quả từ agent
+        """
+        if not self.client:
+            await self.initialize()
+        
+        # Chuẩn bị parts cho message
+        parts = []
+        
+        # Thêm phần text nếu có
+        if message:
+            parts.append({
+                'kind': 'text', 
+                'text': message
+            })
+        
+        # Xử lý dữ liệu ảnh
+        if image_path or image_data:
+            # Đọc file ảnh nếu có đường dẫn
+            if image_path and not image_data:
+                with open(image_path, 'rb') as f:
+                    image_data = f.read()
+            
+            # Xác định mime type (có thể mở rộng để tự động phát hiện)
+            mime_type = "image/jpeg"  # Mặc định là JPEG
+            if image_path:
+                if image_path.lower().endswith('.png'):
+                    mime_type = "image/png"
+                elif image_path.lower().endswith('.gif'):
+                    mime_type = "image/gif"
+            
+            # Mã hóa base64
+            image_base64 = base64.b64encode(image_data).decode('utf-8')
+            
+            # Thêm phần file
+            parts.append({
+                'kind': 'file',
+                'file': {
+                    'name': os.path.basename(image_path) if image_path else "image.jpg",
+                    'mimeType': mime_type,
+                    'bytes': image_base64
+                }
+            })
+        
+        # Chuẩn bị payload
+        send_message_payload: dict[str, Any] = {
+            'message': {
+                'role': 'user',
+                'parts': parts,
+                'messageId': uuid4().hex,
+            },
+        }
+        
+        # Xử lý giống như send_message hiện tại
+        if stream:
+            print(f"🔄 Streaming request với ảnh...")
+            streaming_request = SendStreamingMessageRequest(
+                id=str(uuid4()),
+                params=MessageSendParams(**send_message_payload)
+            )
+            
+            stream_response = self.client.send_message_streaming(streaming_request)
+            result_parts = []
+            
+            async for chunk in stream_response:
+                chunk_data = chunk.model_dump(mode='json', exclude_none=True)
+                print(f"📝 Chunk: {chunk_data}")
+                
+                # Extract content from chunk
+                if 'result' in chunk_data:
+                    result = chunk_data['result']
+                    if 'parts' in result:
+                        for part in result['parts']:
+                            if part.get('type') == 'text':
+                                result_parts.append(part.get('text', ''))
+            
+            return {
+                "status": "success",
+                "content": "\n".join(result_parts),
+                "task_id": streaming_request.id
+            }
+        else:
+            print(f"📨 Gửi tin nhắn với ảnh...")
+            request = SendMessageRequest(
+                id=str(uuid4()),
+                params=MessageSendParams(**send_message_payload)
+            )
+            
+            response = await self.client.send_message(request=request, http_kwargs={"timeout": None})
+            response_data = response.model_dump(mode='json', exclude_none=True)
+            
+            # Extract content from response
+            content = ""
+            if 'result' in response_data:
+                result = response_data['result']
+                if 'parts' in result:
+                    for part in result['parts']:
+                        if part.get('kind') == 'text':
+                            content += part.get('text', '')
+            
+            return {
+                "status": "success",
+                "content": content,
+                "task_id": request.id,
+                "raw_response": response_data
+            }
+
 
 async def demo_queries():
     """Demo queries for testing the advisor agent."""
@@ -236,6 +361,7 @@ async def interactive_mode():
     print("  - 'exit' or 'quit': Exit")
     print("  - 'info': Show agent information")
     print("  - 'stream <message>': Send streaming message")
+    print("  - 'image <path> [description]': Send image with optional description")
     print("  - Or type your eyewear question directly")
     print("─" * 60)
     while True:
@@ -267,6 +393,29 @@ async def interactive_mode():
                 result = await client.send_message(message, stream=True)
                 if result["status"] == "error":
                     print(f"❌ Error: {result['error']}")
+            
+            elif user_input.lower().startswith('image '):
+                # Xử lý lệnh gửi ảnh
+                parts = user_input.split(' ', 2)
+                image_path = parts[1]
+                description = parts[2] if len(parts) > 2 else ""
+                
+                print(f"🖼️ Đang gửi ảnh: {image_path}")
+                print(f"📝 Mô tả: {description}")
+                
+                try:
+                    result = await client.send_message_with_image(
+                        message=description,
+                        image_path=image_path
+                    )
+                    
+                    if result["status"] == "success":
+                        print(f"\n🤖 Chuyên gia tư vấn:")
+                        print(result["content"])
+                    else:
+                        print(f"❌ Error: {result['error']}")
+                except Exception as e:
+                    print(f"❌ Lỗi khi gửi ảnh: {str(e)}")
                     
             else:
                 # Regular message
@@ -286,7 +435,7 @@ async def interactive_mode():
     #             print(f"❌ Unexpected error: {e}")
                 
     # finally:
-    #     await client.close()
+    await client.close()
 
 
 async def main():

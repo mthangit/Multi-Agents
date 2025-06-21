@@ -11,6 +11,7 @@ from nodes.attribute_extraction_node import get_attribute_extraction_node
 from nodes.embed_query_node import get_embed_query_node
 from nodes.semantic_search_node import get_semantic_search_node
 from nodes.format_response_node import get_format_response_node
+from nodes.image_analysis_node import get_image_analysis_node
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 class SearchState(TypedDict):
     """Định nghĩa trạng thái của workflow tìm kiếm."""
     query: Optional[str]
+    original_query: Optional[str]  # Lưu trữ câu query gốc của người dùng
     image_data: Optional[str]
     analysis_result: Optional[Dict[str, Any]]
     intent: Optional[str]
@@ -30,6 +32,7 @@ class SearchState(TypedDict):
     search_results: Optional[List[Dict[str, Any]]]
     final_response: Optional[Dict[str, Any]]
     error: Optional[str]
+    image_analysis: Optional[Dict[str, Any]]
 
 class SearchChain:
     """Chain xử lý tìm kiếm sản phẩm kính mắt."""
@@ -54,6 +57,7 @@ class SearchChain:
         # Khởi tạo các node
         self.intent_classifier = get_intent_classifier_node(api_key=api_key)
         self.attribute_extractor = get_attribute_extraction_node(api_key=api_key)
+        self.image_analyzer = get_image_analysis_node(api_key=api_key)
         
         # Đường dẫn đến mô hình tùy chỉnh
         if custom_model_path and not os.path.exists(custom_model_path):
@@ -78,6 +82,7 @@ class SearchChain:
         # Thêm các node vào workflow
         workflow.add_node("intent_classifier", self.intent_classifier)
         workflow.add_node("intent_router", self._intent_router)  # Đăng ký intent_router như một node
+        workflow.add_node("image_analyzer", self.image_analyzer)  # Node mới với tên đã sửa
         workflow.add_node("attribute_extractor", self.attribute_extractor)
         workflow.add_node("embed_query", self.embed_query)
         workflow.add_node("semantic_search", self.semantic_search)
@@ -90,15 +95,18 @@ class SearchChain:
         # Từ intent_classifier đến intent_router
         workflow.add_edge("intent_classifier", "intent_router")
         
-        # Từ intent_router đến attribute_extractor (được xử lý trong _intent_router)
+        # Từ intent_router đến các node tiếp theo dựa trên loại input
         workflow.add_conditional_edges(
             "intent_router",
-            self._route_by_intent,
+            self._route_by_input_type,
             {
+                "image_analyzer": "image_analyzer",  # Cập nhật tên node
                 "attribute_extractor": "attribute_extractor"
-                # Có thể thêm các node khác ở đây trong tương lai
             }
         )
+        
+        # Từ image_analyzer đến embed_query
+        workflow.add_edge("image_analyzer", "embed_query")
         
         # Từ attribute_extractor đến embed_query
         workflow.add_edge("attribute_extractor", "embed_query")
@@ -127,6 +135,40 @@ class SearchChain:
         """
         # Node này chỉ chuyển tiếp state, việc định tuyến được thực hiện bởi _route_by_intent
         return state
+    
+    def _route_by_input_type(self, state: Dict[str, Any]) -> str:
+        """
+        Hàm định tuyến dựa trên loại input (text/image).
+        
+        Args:
+            state: Trạng thái hiện tại của workflow
+            
+        Returns:
+            Tên của node tiếp theo
+        """
+        query = state.get("query", "")
+        image_data = state.get("image_data")
+        
+        # Lưu trữ query gốc
+        if query:
+            state["original_query"] = query
+        
+        # Nếu chỉ có image_data, không có query
+        if image_data and not query:
+            logger.info("Phát hiện tìm kiếm chỉ bằng hình ảnh, chuyển đến image_analyzer")
+            # Đánh dấu đây là tìm kiếm chỉ bằng ảnh
+            state["search_type"] = "image"
+            return "image_analyzer"  # Cập nhật tên node
+        
+        # Các trường hợp khác (có query hoặc cả query và image)
+        intent = state.get("intent", "unknown")
+        logger.info(f"Định tuyến dựa trên intent: {intent}")
+        
+        # Nếu có cả text và image, đánh dấu là tìm kiếm kết hợp
+        if query and image_data:
+            state["search_type"] = "combined"
+            
+        return self._route_by_intent(state)
     
     def _route_by_intent(self, state: Dict[str, Any]) -> str:
         """
@@ -178,6 +220,7 @@ class SearchChain:
         """
         initial_state = {
             "query": query,
+            "original_query": query,  # Lưu trữ query gốc
             "image_data": base64.b64encode(image_data).decode('utf-8') if image_data else None,
             "analysis_result": analysis_result
         }
@@ -204,6 +247,7 @@ class SearchChain:
         """
         initial_state = {
             "query": query,
+            "original_query": query,  # Lưu trữ query gốc
             "image_data": base64.b64encode(image_data).decode('utf-8') if image_data else None,
             "analysis_result": analysis_result
         }

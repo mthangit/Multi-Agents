@@ -1,204 +1,224 @@
 from typing import Dict, Any, Optional, List
 import logging
-from collections import defaultdict
-import os
-from langchain_google_genai import ChatGoogleGenerativeAI
+import json
+import traceback
 
+from langchain_google_genai import ChatGoogleGenerativeAI
+from prompts.search_prompts import (
+    SEARCH_RESPONSE_PROMPT,
+    SEARCH_RESPONSE_IMAGE_PROMPT,
+    SEARCH_RESPONSE_NO_RESULTS_PROMPT
+)
+
+# Cấu hình logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class FormatResponseNode:
-    """Node xử lý kết quả tìm kiếm và tạo phản hồi cho client."""
+    """Node định dạng kết quả tìm kiếm thành phản hồi cho người dùng."""
     
-    def __init__(self, api_key=None):
+    def __init__(self, api_key: Optional[str] = None):
         """
-        Khởi tạo FormatResponseNode.
+        Khởi tạo node định dạng phản hồi.
         
         Args:
             api_key: API key cho Google Generative AI
         """
-        self.api_key = api_key or os.environ.get("GOOGLE_API_KEY")
-        self.llm = None
-        if self.api_key:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                google_api_key=self.api_key,
-                temperature=0.5,
-                convert_system_message_to_human=True
-            )
-        else:
-            logger.warning("GOOGLE_API_KEY không được cung cấp, sẽ không sử dụng LLM")
+        self.llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            google_api_key=api_key,
+            temperature=0.4,
+            streaming=False
+        )
+        logger.info("FormatResponseNode đã được khởi tạo")
     
     def __call__(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Xử lý kết quả tìm kiếm và tạo phản hồi.
+        Định dạng kết quả tìm kiếm thành phản hồi.
         
         Args:
             state: Trạng thái hiện tại của workflow
             
         Returns:
-            Dict chứa phản hồi đã được định dạng
+            Dict chứa phản hồi cuối cùng
         """
         # Lấy thông tin từ state
         search_results = state.get("search_results", [])
-        query = state.get("query", "")
         normalized_query = state.get("normalized_query", "")
-        extracted_attributes = state.get("extracted_attributes", {})
-        
-        # Lấy recommended_shapes từ extracted_attributes
-        recommended_shapes = extracted_attributes.get("recommended_shapes", [])
-        
-        # Định dạng kết quả
-        formatted_response = self._format_search_results(
-            results=search_results,
-            query_text=query or normalized_query,
-            recommended_shapes=recommended_shapes
-        )
-        
-        # Tạo câu trả lời từ LLM
-        llm_response = self._generate_llm_response(
-            products=formatted_response["products"],
-            query=query or normalized_query,
-            extracted_attributes=extracted_attributes,
-        )
-        
-        # Thêm câu trả lời LLM vào response
-        formatted_response["llm_response"] = llm_response
-        
-        return {"final_response": formatted_response}
-    
-    def _format_search_results(
-        self, 
-        results: List[Dict[str, Any]], 
-        query_text: Optional[str] = None,
-        recommended_shapes: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
-        """
-        Định dạng kết quả tìm kiếm thành JSON phù hợp.
-        
-        Args:
-            results: Danh sách kết quả tìm kiếm
-            query_text: Văn bản tìm kiếm ban đầu
-            recommended_shapes: Các hình dạng gọng kính được đề xuất
-            
-        Returns:
-            Kết quả được định dạng thành JSON
-        """
-        products = []
-        for product in results:
-            products.append({
-                "product_id": product.get("product_id", ""),
-                "name": product.get("name", ""),
-                "brand": product.get("brand", ""),
-                "price": product.get("price", 0),
-                "description": product.get("description", ""),
-                "image_url": product.get("images", [""])[0] if product.get("images") else "",
-                "frame_color": product.get("color", ""),
-                "category": product.get("category", ""),
-                "gender": product.get("gender", ""),
-                "score": product.get("score", 0),
-            })
-
-        return {
-            "products": products,
-            "count": len(products),
-        }
-    
-    def _generate_llm_response(
-        self,
-        products: List[Dict[str, Any]],
-        query: str,
-        extracted_attributes: Dict[str, Any],
-    ) -> str:
-        """
-        Tạo câu trả lời từ LLM dựa trên kết quả tìm kiếm.
-        
-        Args:
-            products: Danh sách sản phẩm
-            query: Câu truy vấn gốc
-            extracted_attributes: Các thuộc tính được trích xuất
-            summary: Tóm tắt kết quả tìm kiếm
-            
-        Returns:
-            Câu trả lời từ LLM
-        """
-        summary = "Không tìm thấy sản phẩm, bạn hãy tìm lại thử xem, Eyevi sẽ hỗ trợ bạn tìm kiếm sản phẩm phù hợp nhất."
-        if not self.llm or not products:
-            # Nếu không có LLM hoặc không có sản phẩm, trả về summary
-            return summary
+        original_query = state.get("original_query", "")  # Lấy query gốc của người dùng
+        search_type = state.get("search_type", "text")
+        image_analysis = state.get("image_analysis", {})
         
         try:
-            # Tạo prompt cho LLM
-            prompt = self._create_llm_prompt(products, query, extracted_attributes)
+            # Kiểm tra nếu có lỗi
+            if state.get("error"):
+                logger.error(f"Lỗi từ các node trước: {state['error']}")
+                return {
+                    "final_response": {
+                        "error": state["error"],
+                        "products": [],
+                        "count": 0,
+                        "summary": "Xin lỗi, đã xảy ra lỗi khi tìm kiếm sản phẩm."
+                    }
+                }
             
-            # Gọi LLM để tạo câu trả lời
-            from langchain.schema import HumanMessage, SystemMessage
-            messages = [
-                SystemMessage(content="""Bạn là Eyevi - chatbot chuyên gia tư vấn kính mắt cho cửa hàng thương mại điện tử. 
-                Hãy trả lời câu hỏi của khách hàng dựa trên kết quả tìm kiếm sản phẩm.
-                Hãy viết câu trả lời thân thiện, gần gũi với khách hàng, chuyên nghiệp và giải thích tại sao những sản phẩm này phù hợp với yêu cầu của khách hàng. Trả lời như một sale chuyên nghiệp, dùng kỹ năng bán hàng tuyệt đỉnh để khách hàng đọc và muốn mua. Đ
-                Đưa ra lời khuyên về việc lựa chọn kính phù hợp dựa trên thông tin đã cung cấp.
-                Trả lời bằng tiếng Việt nhé."""),
-                HumanMessage(content=prompt)
-            ]
+            # Kiểm tra nếu không có kết quả
+            if not search_results:
+                logger.info("Không có kết quả tìm kiếm, tạo phản hồi thông báo")
+                llm_response = self._generate_no_results_response(
+                    original_query or normalized_query, 
+                    search_type
+                )
+                return {
+                    "final_response": {
+                        "products": [],
+                        "count": 0,
+                        "summary": "Không tìm thấy sản phẩm phù hợp.",
+                        "llm_response": llm_response
+                    }
+                }
             
-            response = self.llm.invoke(messages)
+            # Tạo phản hồi dựa trên loại tìm kiếm
+            if search_type == "image":
+                logger.info("Sử dụng prompt cho tìm kiếm bằng hình ảnh")
+                llm_response = self._generate_image_search_response(
+                    search_results, 
+                    image_analysis,
+                    original_query
+                )
+            else:
+                logger.info("Sử dụng prompt cho tìm kiếm bằng văn bản")
+                llm_response = self._generate_text_search_response(
+                    search_results, 
+                    original_query or normalized_query
+                )
+            
+            # Tạo kết quả cuối cùng
+            final_response = {
+                "products": search_results,
+                "count": len(search_results),
+                "llm_response": llm_response,
+                "search_type": search_type
+            }
+            
+            logger.info("Đã tạo phản hồi cuối cùng")
+            return {"final_response": final_response}
+            
+        except Exception as e:
+            logger.error(f"Lỗi khi định dạng phản hồi: {e}")
+            logger.error(traceback.format_exc())
+            return {
+                "final_response": {
+                    "error": str(e),
+                    "products": search_results,
+                    "count": len(search_results),
+                    "summary": "Đã xảy ra lỗi khi định dạng kết quả tìm kiếm."
+                }
+            }
+    
+    def _generate_text_search_response(
+        self, 
+        search_results: List[Dict[str, Any]], 
+        query: str
+    ) -> str:
+        """
+        Tạo phản hồi cho tìm kiếm bằng văn bản.
+        
+        Args:
+            search_results: Danh sách kết quả tìm kiếm
+            query: Câu truy vấn tìm kiếm
+            
+        Returns:
+            Phản hồi dạng văn bản
+        """
+        try:
+            # Giới hạn số lượng sản phẩm để đưa vào prompt
+            limited_results = search_results[:5]
+            
+            # Tạo prompt
+            prompt = SEARCH_RESPONSE_PROMPT.format(
+                query=query,
+                products=json.dumps(limited_results, ensure_ascii=False, indent=2)
+            )
+            
+            # Gọi LLM
+            response = self.llm.invoke(prompt)
+            logger.info("Đã nhận phản hồi từ LLM")
+            
             return response.content
             
         except Exception as e:
-            logger.error(f"Lỗi khi tạo câu trả lời từ LLM: {e}")
-            return summary
+            logger.error(f"Lỗi khi tạo phản hồi cho tìm kiếm văn bản: {e}")
+            return f"Tìm thấy {len(search_results)} sản phẩm phù hợp với yêu cầu của bạn."
     
-    def _create_llm_prompt(
-        self,
-        products: List[Dict[str, Any]],
-        query: str,
-        extracted_attributes: Dict[str, Any],
+    def _generate_image_search_response(
+        self, 
+        search_results: List[Dict[str, Any]], 
+        image_analysis: Dict[str, Any],
+        original_query: str = ""
     ) -> str:
         """
-        Tạo prompt cho LLM.
+        Tạo phản hồi cho tìm kiếm bằng hình ảnh.
         
         Args:
-            products: Danh sách sản phẩm
-            query: Câu truy vấn gốc
-            extracted_attributes: Các thuộc tính được trích xuất
-            summary: Tóm tắt kết quả tìm kiếm
+            search_results: Danh sách kết quả tìm kiếm
+            image_analysis: Kết quả phân tích hình ảnh
+            original_query: Câu truy vấn gốc của người dùng (nếu có)
             
         Returns:
-            Prompt cho LLM
+            Phản hồi dạng văn bản
         """
-        # Tạo thông tin chi tiết về các sản phẩm (tối đa 5 sản phẩm)
-        product_details = []
-        for i, product in enumerate(products[:5], 1):
-            detail = f"""
-            Sản phẩm {i}:
-            - Mô tả: {product['description']}
-            """
-            product_details.append(detail) 
-        
-        # Tạo thông tin về các thuộc tính được trích xuất
-        attribute_details = []
-        for key, value in extracted_attributes.items():
-            if value and key != "recommended_shapes":
-                attribute_details.append(f"- {key}: {value}")
-        logger.info(f"JSON được trích xuất: {extracted_attributes}")
-        logger.info(f"Các sản phẩm đã tìm được: {product_details}")
-        # Tạo prompt
-        prompt = f"""
-        Câu hỏi của khách hàng: "{query}"
-        
-        Các thuộc tính được trích xuất từ câu hỏi:
-        {chr(10).join(attribute_details) if attribute_details else "- Không có thuộc tính cụ thể"}
-
-        Chi tiết các sản phẩm đã tìm dược từ query: 
-        {chr(10).join(product_details)}
-        
-        Hãy tạo một câu trả lời thân thiện và chuyên nghiệp cho khách hàng, giới thiệu các sản phẩm phù hợp và đưa ra lời khuyên về việc lựa chọn kính mắt. Câu trả lời nên ngắn gọn, súc tích nhưng đầy đủ thông tin.
+        try:
+            # Giới hạn số lượng sản phẩm để đưa vào prompt
+            limited_results = search_results[:5]
+            
+            # Tạo prompt
+            prompt = SEARCH_RESPONSE_IMAGE_PROMPT.format(
+                user_query=original_query,
+                image_analysis=json.dumps(image_analysis, ensure_ascii=False, indent=2),
+                products=json.dumps(limited_results, ensure_ascii=False, indent=2)
+            )
+            
+            # Gọi LLM
+            response = self.llm.invoke(prompt)
+            logger.info("Đã nhận phản hồi từ LLM")
+            
+            return response.content
+            
+        except Exception as e:
+            logger.error(f"Lỗi khi tạo phản hồi cho tìm kiếm hình ảnh: {e}")
+            return f"Tìm thấy {len(search_results)} sản phẩm phù hợp với hình ảnh bạn đã gửi."
+    
+    def _generate_no_results_response(self, query: str, search_type: str) -> str:
         """
+        Tạo phản hồi khi không có kết quả tìm kiếm.
         
-        return prompt
+        Args:
+            query: Câu truy vấn tìm kiếm
+            search_type: Loại tìm kiếm
+            
+        Returns:
+            Phản hồi dạng văn bản
+        """
+        try:
+            # Tạo prompt
+            prompt = SEARCH_RESPONSE_NO_RESULTS_PROMPT.format(
+                query=query,
+                search_type=search_type
+            )
+            
+            # Gọi LLM
+            response = self.llm.invoke(prompt)
+            logger.info("Đã nhận phản hồi từ LLM cho trường hợp không có kết quả")
+            
+            return response.content
+            
+        except Exception as e:
+            logger.error(f"Lỗi khi tạo phản hồi cho trường hợp không có kết quả: {e}")
+            return "Xin lỗi, chúng tôi không tìm thấy sản phẩm nào phù hợp với yêu cầu của bạn."
 
 # Hàm tiện ích để tạo node
-def get_format_response_node(api_key=None) -> FormatResponseNode:
+def get_format_response_node(api_key: Optional[str] = None) -> FormatResponseNode:
     """
     Tạo một instance của FormatResponseNode.
     
