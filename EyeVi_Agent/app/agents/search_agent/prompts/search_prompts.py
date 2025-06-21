@@ -8,19 +8,16 @@ Các intent có sẵn:
 - search_product
 - product_detail
 - compare_products
-- filter_by_feature
-- faq_about_material
-- availability_check
-- recommendation_request
-- product_category_stats
 - unknown
 
 Hãy trả về chỉ duy nhất tên intent (không cần giải thích).
 """
 
 EXTRACT_QUERY = """
-Bạn là một trợ lý AI giúp chuẩn hóa truy vấn tìm kiếm kính mắt của người dùng.
+Hãy thực hiện chuẩn hóa câu truy vấn của người dùng. 
+
 Khi nhận được yêu cầu: {query}
+
 Hãy trích xuất thông tin về các thuộc tính sau nếu có:  
 - category (Kính Mát hoặc Gọng Kính)
 - gender (Nam / Nữ / Unisex)
@@ -29,17 +26,34 @@ Hãy trích xuất thông tin về các thuộc tính sau nếu có:
 - frameMaterial (ví dụ: Kim loại, Nhựa, Nhựa Injection, Titan,...)
 - frameShape (ví dụ: Vuông, Tròn, Đa giác, Mắt mèo,...)
 
-Hãy trả về 2 phần:
-1. `normalized_description` (một câu mô tả hoàn chỉnh, có định dạng chuẩn sau):
-    => "(Category) (Gender) (Brand) màu (Color), khung (FrameMaterial), kiểu dáng (FrameShape)"
+Trả về **2 phần dưới dạng JSON duy nhất**:
 
-2. `slots`: Dạng dictionary lưu thông tin được trích xuất. Nếu không rõ, để chuỗi rỗng.
+1. `normalized_description`: Một câu mô tả hoàn chỉnh, có định dạng chuẩn như sau:
+    → "(Category) (Gender) (Brand) màu (Color), khung (FrameMaterial), kiểu dáng (FrameShape)"
 
-### Chú ý:
-- Nếu thiếu thuộc tính nào, không xuất hiện trong câu mô tả, rút gọn lại, bỏ dấy phẩy và từ bổ nghĩa.
-- Viết hoa chữ cái đầu của các giá trị (ví dụ: "Xanh Dương", "Vuông")
-- Người dùng sẽ sử dụng ngôn ngữ Tiếng Việt, nếu có sai chính tả, hãy chuẩn hóa lại theo kiến thức của bạn.
+2. `slots`: Một dictionary lưu các thuộc tính trích xuất. Nếu không tìm thấy giá trị cho thuộc tính nào, hãy để chuỗi rỗng (`""`).
 
+### Quan trọng:
+- Tuyệt đối **chỉ trả về JSON duy nhất**, không thêm ví dụ, giải thích, hướng dẫn, markdown hoặc văn bản khác.
+- Nếu không trích xuất được bất kỳ thuộc tính nào, để `normalized_description` rỗng (`""`) và tất cả các giá trị trong `slots` là chuỗi rỗng.
+- Viết hoa chữ cái đầu của giá trị (VD: "Xanh Dương", "Vuông")
+- Người dùng sẽ sử dụng ngôn ngữ Tiếng Việt, nếu có sai chính tả, hãy tự động chuẩn hóa lại.
+- Trả về đúng định dạng như sau:
+
+```json
+{
+  "normalized_description": "...",
+  "slots": {
+    "category": "...",
+    "gender": "...",
+    "brand": "...",
+    "color": "...",
+    "frameMaterial": "...",
+    "frameShape": "..."
+  }
+}
+``` 
+Ví dụ:
 Truy vấn: "Tôi muốn kính xanh dương của PUMA dành cho nữ, kiểu vuông"
 Kết quả:
 ```json
@@ -54,4 +68,18 @@ Kết quả:
   }
 }
 ```
+Họăc với truy vấn mơ hồ: Tôi muốn tìm kính
+Phản hồi mong muốn:
+{
+  "normalized_description": "",
+  "slots": {
+    "category": "",
+    "gender": "",
+    "brand": "",
+    "color": "",
+    "frameMaterial": "",
+    "frameShape": ""
+  }
+}
+
 """

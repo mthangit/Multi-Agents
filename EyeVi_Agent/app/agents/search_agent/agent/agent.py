@@ -31,7 +31,7 @@ class SearchAgent:
         # Đường dẫn đến mô hình CLIP tùy chỉnh
         custom_model_path = os.environ.get(
             "CLIP_MODEL_PATH", 
-            os.path.join(os.path.dirname(__file__), "models/clip/CLIP_FTMT.pt")
+            os.path.join(os.path.dirname(__file__), "../models/clip/CLIP_FTMT.pt")
         )
         
         # Khởi tạo SearchChain

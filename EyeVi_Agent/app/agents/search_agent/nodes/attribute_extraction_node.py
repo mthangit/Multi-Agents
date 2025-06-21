@@ -77,6 +77,13 @@ class AttributeExtractionNode:
             logger.info(f"Câu mô tả chuẩn hóa: {result.get('normalized_description', query)}")
             
             # Cập nhật state với thuộc tính đã trích xuất
+            # Kiểm tra nếu normalized_attributes rỗng thì trả về query gốc
+            if not normalized_attributes:
+                return {
+                    "extracted_attributes": {},
+                    "normalized_query": query
+                }
+            
             return {
                 "extracted_attributes": normalized_attributes,
                 "normalized_query": result.get("normalized_description", query)

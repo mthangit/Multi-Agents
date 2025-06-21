@@ -65,7 +65,7 @@ class SearchChain:
             qdrant_host="http://eyevi.devsecopstech.click",  # Cố định localhost
             qdrant_port=qdrant_port
         )
-        self.format_response = get_format_response_node()
+        self.format_response = get_format_response_node(api_key=api_key)
         
         # Xây dựng workflow
         self.workflow = self._build_workflow()

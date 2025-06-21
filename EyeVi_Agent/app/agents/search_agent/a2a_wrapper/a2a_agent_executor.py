@@ -63,13 +63,18 @@ class SearchAgentExecutor(AgentExecutor):
                 analysis_result=None  # Handle analysis result if needed
             )
 
-            # Convert result to A2A parts
-            parts = [Part(root=TextPart(text=str(result)))]
+            # Format the response as text
+            formatted_result = self._format_search_result(result)
+            
+            # Create parts for the task artifact (full result)
+            parts = [Part(root=TextPart(text=json.dumps(result, ensure_ascii=False, indent=2)))]
 
             # Update task status and complete
             await updater.add_artifact(parts, name="search_result")
+            
+            # Send formatted text response to the user
             await event_queue.enqueue_event(new_agent_text_message(
-                text=result,
+                text=formatted_result,
                 context_id=context.context_id,
                 task_id=context.task_id,
             ))
@@ -162,6 +167,11 @@ class SearchAgentExecutor(AgentExecutor):
             if result.get("error"):
                 return f"❌ Lỗi tìm kiếm: {result['error']}"
             
+            # Ưu tiên sử dụng câu trả lời từ LLM nếu có
+            if result.get("llm_response"):
+                return result["llm_response"]
+            
+            # Nếu không có câu trả lời từ LLM, sử dụng định dạng cũ
             products = result.get("products", [])
             count = result.get("count", len(products))
             summary = result.get("summary", "")

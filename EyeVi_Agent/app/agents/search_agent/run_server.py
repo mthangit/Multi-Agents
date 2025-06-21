@@ -309,7 +309,13 @@ if __name__ == "__main__":
     
     a2a_server = create_a2a_server("localhost", 10002)
     uvicorn.run(a2a_server.build(), host="localhost", port=10002)
-        
+    
+    # uvicorn.run(
+    #         "run_server:app",
+    #         host="localhost",
+    #         port=8001,
+    #         reload=False
+    #     ) 
         
         # # Lưu thông tin host và port vào môi trường
         # os.environ["SEARCH_AGENT_HOST"] = "localhost"
