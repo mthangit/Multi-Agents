@@ -50,10 +50,7 @@ class ImageAnalysisNode:
         # Kiểm tra nếu không có dữ liệu hình ảnh
         if not image_data:
             logger.warning("Không có dữ liệu hình ảnh, bỏ qua phân tích")
-            return {
-                "normalized_query": "kính mắt",
-                "image_analysis": None
-            }
+            return state  # Trả về state không thay đổi, không thêm normalized_query
         
         try:
             # Tạo hash đơn giản từ image_data để làm key cho cache
@@ -62,37 +59,49 @@ class ImageAnalysisNode:
             # Kiểm tra cache
             if image_hash in self._cache:
                 logger.info("Sử dụng kết quả phân tích từ cache")
-                return self._cache[image_hash]
+                result = self._cache[image_hash]
+            else:
+                # Phân tích hình ảnh
+                image_analysis = self._analyze_image(image_data)
+                
+                # Tạo normalized_query và extracted_attributes chỉ khi hình ảnh có chứa kính mắt
+                if image_analysis.get("contains_eyewear", False):
+                    normalized_query = self._create_query_from_analysis(image_analysis)
+                    extracted_attributes = self._create_attributes_from_analysis(image_analysis)
+                else:
+                    normalized_query = ""
+                    extracted_attributes = {}
+                
+                # Tạo kết quả
+                result = {
+                    "image_analysis": image_analysis,
+                    "extracted_attributes": extracted_attributes
+                }
+                
+                # Chỉ thêm normalized_query khi hình ảnh có chứa kính mắt
+                if image_analysis.get("contains_eyewear", False):
+                    result["normalized_query"] = normalized_query
+                
+                # Lưu vào cache
+                self._cache[image_hash] = result
             
-            # Phân tích hình ảnh
-            image_analysis = self._analyze_image(image_data)
+            # Cập nhật state với kết quả phân tích
+            state["image_analysis"] = result.get("image_analysis")
             
-            # Tạo normalized_query từ kết quả phân tích
-            normalized_query = self._create_query_from_analysis(image_analysis)
+            # Chỉ đặt normalized_query và extracted_attributes khi hình ảnh có chứa kính mắt
+            if result.get("image_analysis", {}).get("contains_eyewear", False):
+                if "normalized_query" in result:
+                    state["normalized_query"] = result["normalized_query"]
+                if "extracted_attributes" in result:
+                    state["extracted_attributes"] = result["extracted_attributes"]
             
-            # Tạo extracted_attributes từ kết quả phân tích
-            extracted_attributes = self._create_attributes_from_analysis(image_analysis)
-            
-            # Tạo kết quả
-            result = {
-                "normalized_query": normalized_query,
-                "image_analysis": image_analysis,
-                "extracted_attributes": extracted_attributes
-            }
-            
-            # Lưu vào cache
-            self._cache[image_hash] = result
-            
-            return result
+            return state
             
         except Exception as e:
             logger.error(f"Lỗi khi phân tích hình ảnh: {e}")
             logger.error(f"Chi tiết lỗi: {traceback.format_exc()}")
-            return {
-                "normalized_query": "kính mắt",
-                "image_analysis": None,
-                "error": str(e)
-            }
+            state["error"] = f"Lỗi khi phân tích hình ảnh: {str(e)}"
+            return state
     
     def _get_image_hash(self, image_data: str) -> str:
         """
@@ -171,7 +180,7 @@ class ImageAnalysisNode:
                 },
                 "face_description": "",
                 "general_description": "Không thể phân tích hình ảnh",
-                "suggested_search_terms": ["kính mắt"]
+                "suggested_search_terms": []  # Không đặt giá trị mặc định "kính mắt"
             }
     
     def _parse_analysis_result(self, result_text: str) -> Dict[str, Any]:
@@ -211,7 +220,7 @@ class ImageAnalysisNode:
                     },
                     "face_description": "",
                     "general_description": "Không thể phân tích hình ảnh",
-                    "suggested_search_terms": ["kính mắt"]
+                    "suggested_search_terms": []
                 }
         except json.JSONDecodeError as e:
             logger.error(f"Lỗi khi phân tích JSON: {e}")
@@ -244,7 +253,7 @@ class ImageAnalysisNode:
                 },
                 "face_description": "",
                 "general_description": "Không thể phân tích hình ảnh",
-                "suggested_search_terms": ["kính mắt"]
+                "suggested_search_terms": []
             }
     
     def _create_query_from_analysis(self, image_analysis: Dict[str, Any]) -> str:
@@ -285,14 +294,14 @@ class ImageAnalysisNode:
             parts.append(brand)
         
         # Thêm màu sắc
-        color = eyewear_desc.get("color", "")
-        if color:
-            parts.append(f"màu {color}")
+        # color = eyewear_desc.get("color", "")
+        # if color:
+        #     parts.append(f"màu {color}")
         
         # Thêm chất liệu
-        material = eyewear_desc.get("frame_material", "")
-        if material:
-            parts.append(f"khung {material}")
+        # material = eyewear_desc.get("frame_material", "")
+        # if material:
+        #     parts.append(f"khung {material}")
         
         # Thêm hình dáng
         shape = eyewear_desc.get("frame_shape", "")
@@ -346,8 +355,8 @@ class ImageAnalysisNode:
             attributes["brand"] = eyewear_desc["brand"]
         
         # Thêm color
-        if eyewear_desc.get("color", ""):
-            attributes["color"] = eyewear_desc["color"]
+        # if eyewear_desc.get("color", ""):
+        #     attributes["color"] = eyewear_desc["color"]
         
         # Thêm frame_material
         if eyewear_desc.get("frame_material", ""):

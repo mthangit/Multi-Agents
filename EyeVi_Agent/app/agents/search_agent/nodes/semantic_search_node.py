@@ -59,6 +59,19 @@ class SemanticSearchNode:
         logger.info(f"Query chuẩn hóa: {normalized_query}")
         logger.info(f"Thuộc tính đã trích xuất: {extracted_attributes}")
         
+        # Kiểm tra và điều chỉnh search_type nếu cần
+        # Nếu search_type là combined nhưng không có text_embedding, chuyển thành image
+        if search_type == "combined" and not text_embedding:
+            logger.info("Điều chỉnh search_type từ 'combined' thành 'image' vì không có text_embedding")
+            search_type = "image"
+            state["search_type"] = "image"
+            
+        # Nếu search_type là combined nhưng không có image_embedding, chuyển thành text
+        elif search_type == "combined" and not image_embedding:
+            logger.info("Điều chỉnh search_type từ 'combined' thành 'text' vì không có image_embedding")
+            search_type = "text"
+            state["search_type"] = "text"
+        
         # Số lượng kết quả trả về
         limit = state.get("limit", self.default_limit)
         

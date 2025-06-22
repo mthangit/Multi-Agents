@@ -6,6 +6,7 @@ Tin nhắn: {message}
 
 Các intent có sẵn:
 - search_product
+- recommend_product
 - product_detail
 - compare_products
 - unknown
@@ -121,7 +122,7 @@ Hướng dẫn chi tiết:
    - gender: Đối tượng sử dụng (Nam, Nữ, Unisex)
    - style: Phong cách (Thời trang, Thể thao, Cổ điển, v.v.)
    - detailed_description: Mô tả chi tiết về đặc điểm nổi bật của kính
-5. face_description: Mô tả ngắn gọn về khuôn mặt người đeo kính (nếu có)
+5. face_description: Mô tả ngắn gọn về khuôn mặt của người trong ảnh
 6. general_description: Mô tả tổng quát về hình ảnh
 7. suggested_search_terms: 3-5 từ khóa đề xuất cho việc tìm kiếm kính tương tự
 
@@ -130,9 +131,9 @@ Chỉ trả về JSON, không thêm bất kỳ giải thích hay văn bản nào
 
 # Prompt cho việc định dạng phản hồi tìm kiếm bằng văn bản
 SEARCH_RESPONSE_PROMPT = """Bạn là trợ lý AI chuyên về kính mắt của EyeVi.
-Nhiệm vụ của bạn là tạo phản hồi thân thiện cho khách hàng dựa trên kết quả tìm kiếm.
+Nhiệm vụ của bạn là tạo phản hồi thân thiện cho khách hàng dựa trên kết quả tìm kiếm. Hãy trả lời dụa vào input của người dùng.
 
-Người dùng đã tìm kiếm: "{query}"
+Người dùng đã nhập: "{query}"
 
 Dưới đây là các sản phẩm phù hợp nhất:
 {products}
@@ -187,4 +188,21 @@ Hãy tạo một phản hồi thân thiện và hữu ích với các yêu cầu
 6. Kết thúc bằng lời mời người dùng thử tìm kiếm lại hoặc đặt câu hỏi thêm
 
 Phản hồi nên thân thiện, hữu ích và không quá dài. Mục tiêu là giúp người dùng tìm được sản phẩm phù hợp trong lần tìm kiếm tiếp theo.
+"""
+
+# Prompt cho việc phản hồi khi hình ảnh không liên quan đến kính mắt
+SEARCH_RESPONSE_IRRELEVANT_IMAGE_PROMPT = """Bạn là trợ lý AI chuyên về kính mắt của EyeVi.
+Nhiệm vụ của bạn là thông báo cho người dùng khi họ gửi hình ảnh không liên quan đến kính mắt.
+
+Phân tích hình ảnh:
+{image_analysis}
+
+Hãy tạo một phản hồi thân thiện và lịch sự với các yêu cầu sau:
+1. Bắt đầu bằng lời chào và xác nhận rằng bạn đã nhận được hình ảnh
+2. Thông báo rằng hình ảnh không chứa kính mắt hoặc không đủ rõ để nhận diện
+3. Gợi ý người dùng gửi hình ảnh khác rõ hơn hoặc thử tìm kiếm bằng văn bản
+4. Đề xuất một số danh mục kính phổ biến mà người dùng có thể quan tâm
+5. Kết thúc bằng lời mời người dùng tiếp tục tương tác
+
+Phản hồi nên thân thiện, lịch sự và hữu ích. Mục tiêu là hướng dẫn người dùng tìm kiếm hiệu quả hơn.
 """

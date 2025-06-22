@@ -7,7 +7,8 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from prompts.search_prompts import (
     SEARCH_RESPONSE_PROMPT,
     SEARCH_RESPONSE_IMAGE_PROMPT,
-    SEARCH_RESPONSE_NO_RESULTS_PROMPT
+    SEARCH_RESPONSE_NO_RESULTS_PROMPT,
+    SEARCH_RESPONSE_IRRELEVANT_IMAGE_PROMPT
 )
 
 # Cấu hình logging
@@ -169,15 +170,27 @@ class FormatResponseNode:
             Phản hồi dạng văn bản
         """
         try:
-            # Giới hạn số lượng sản phẩm để đưa vào prompt
-            limited_results = search_results[:5]
+            # Kiểm tra xem hình ảnh có chứa kính mắt không
+            contains_eyewear = image_analysis.get("contains_eyewear", False)
             
-            # Tạo prompt
-            prompt = SEARCH_RESPONSE_IMAGE_PROMPT.format(
-                user_query=original_query,
-                image_analysis=json.dumps(image_analysis, ensure_ascii=False, indent=2),
-                products=json.dumps(limited_results, ensure_ascii=False, indent=2)
-            )
+            if not contains_eyewear:
+                # Tạo phản hồi cho trường hợp hình ảnh không chứa kính mắt
+                logger.info("Hình ảnh không chứa kính mắt, sử dụng prompt cho hình ảnh không liên quan")
+                prompt = SEARCH_RESPONSE_IRRELEVANT_IMAGE_PROMPT.format(
+                    image_analysis=json.dumps(image_analysis, ensure_ascii=False, indent=2)
+                )
+            else:
+                # Tạo phản hồi bình thường cho hình ảnh có chứa kính mắt
+                logger.info("Hình ảnh có chứa kính mắt, sử dụng prompt tìm kiếm hình ảnh thông thường")
+                # Giới hạn số lượng sản phẩm để đưa vào prompt
+                limited_results = search_results[:5]
+                
+                # Tạo prompt
+                prompt = SEARCH_RESPONSE_IMAGE_PROMPT.format(
+                    user_query=original_query,
+                    image_analysis=json.dumps(image_analysis, ensure_ascii=False, indent=2),
+                    products=json.dumps(limited_results, ensure_ascii=False, indent=2)
+                )
             
             # Gọi LLM
             response = self.llm.invoke(prompt)
