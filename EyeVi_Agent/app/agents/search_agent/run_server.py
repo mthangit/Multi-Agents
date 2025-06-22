@@ -240,7 +240,7 @@ def create_a2a_server(host: str, port: int) -> A2AStarletteApplication:
 
     # Create agent card with specialized search capabilities
     agent_card = AgentCard(
-        name='Search Agent - Tìm kiếm sản phẩm mắt kính',
+        name='Search Agent',
         description='Agent tìm kiếm sản phẩm mắt kính sử dụng công nghệ CLIP multimodal, hỗ trợ tìm kiếm bằng văn bản, hình ảnh và kết hợp đa phương thức với độ chính xác cao',
         url=f'http://{host}:{port}/',
         version='1.0.0',
