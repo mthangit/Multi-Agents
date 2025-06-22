@@ -17,6 +17,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.tools import tool
 import json
 from decimal import Decimal
+from datetime import datetime, date
 from src.database.queries.product import ProductQuery
 from src.database.queries.user import UserQuery
 from src.database.queries.order import OrderQuery
@@ -27,10 +28,12 @@ logger = logging.getLogger(__name__)
 
 # ============ CUSTOM JSON ENCODER ============
 class DecimalEncoder(json.JSONEncoder):
-    """Custom JSON encoder để xử lý Decimal"""
+    """Custom JSON encoder để xử lý Decimal và datetime"""
     def default(self, obj):
         if isinstance(obj, Decimal):
             return float(obj)
+        elif isinstance(obj, (datetime, date)):
+            return obj.isoformat()
         return super(DecimalEncoder, self).default(obj)
 
 def safe_json_dumps(data):
@@ -508,6 +511,7 @@ Ví dụ tạo đơn hàng:
 HƯỚNG DẪN TRẢ LỜI:
 - Khi gọi tool, bạn có thể thêm text bổ sung thân thiện như "Tôi sẽ tìm sản phẩm cho bạn", "Đây là thông tin sản phẩm:", v.v.
 - Sau đó gọi tool để lấy thông tin chi tiết
+- Đảm bảo trả lời đầy đủ thông tin, trả về thêm DATA_MARKER để client xử lý
 - Luôn trả lời bằng tiếng Việt và thân thiện!"""
             
             messages = [AIMessage(content=system_prompt)] + messages

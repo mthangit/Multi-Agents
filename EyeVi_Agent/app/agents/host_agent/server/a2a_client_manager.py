@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 from uuid import uuid4
 
-import aioredis
+import redis.asyncio as aioredis
 from a2a.client import A2AClient, A2ACardResolver
 from a2a.types import SendMessageRequest, SendStreamingMessageRequest, MessageSendParams
 
@@ -32,19 +32,19 @@ class ChatHistory:
         self.created_at = datetime.now()
         self.last_updated = datetime.now()
     
-    def add_message(self, role: str, content: str, agent_used: Optional[str] = None, user_id: Optional[str] = None):
+    def add_message(self, role: str, content: str, clarified_content: str, agent_used: Optional[str] = None, user_id: Optional[str] = None):
         """Thêm message vào lịch sử"""
         message = {
             "role": role,
             "content": content,
+            "clarified_content": clarified_content,
             "timestamp": datetime.now().isoformat(),
-            "message_id": uuid4().hex
         }
         if agent_used:
             message["agent_used"] = agent_used
         if user_id:
             message["user_id"] = user_id
-            
+
         self.messages.append(message)
         self.last_updated = datetime.now()
     
@@ -368,13 +368,11 @@ class A2AClientManager:
             if user_id and self.redis_client:
                 # Sử dụng Redis
                 chat_history = await self._ensure_chat_history_with_redis(user_id, session_id)
-                chat_history.add_message("user", message_content, user_id=user_id)
                 chat_history.add_message("assistant", response, agent_name)
                 await self._save_chat_history_to_redis(user_id, session_id, chat_history)
             else:
                 # Fallback to in-memory
                 self._ensure_chat_history(session_id)
-                self.chat_histories[session_id].add_message("user", message_content, user_id=user_id)
                 self.chat_histories[session_id].add_message("assistant", response, agent_name)
         
         return response

@@ -5,8 +5,7 @@ nest-asyncio
 python-dotenv
 
 # Redis for chat history storage
-redis
-aioredis
+redis[hiredis]>=4.5.0
 
 # FastAPI dependencies
 fastapi

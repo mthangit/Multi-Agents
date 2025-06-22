@@ -41,6 +41,7 @@ class ChatResponse(BaseModel):
     session_id: Optional[str] = None
     clarified_message: Optional[str] = None
     analysis: Optional[str] = None
+    data: Optional[str] = None
     status: str = "success"
     timestamp: str
 
@@ -156,6 +157,7 @@ async def chat(
             session_id=result.get("session_id"),
             clarified_message=result.get("clarified_message"),
             analysis=result.get("analysis"),
+            data=result.get("data"),
             status="success",
             timestamp=datetime.now().isoformat()
         )

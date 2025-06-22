@@ -58,22 +58,12 @@ class HostServer:
     async def _setup_orchestrator_chain(self):
         """Setup LangChain cho việc phân tích và điều phối"""
         
-        # Chuẩn bị ROOT_INSTRUCTION với ngày hiện tại
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        formatted_root_instruction = ROOT_INSTRUCTION.replace(
-            "{datetime.now().strftime(\"%Y-%m-%d\")}", 
-            current_date
-        )
         
         # Tạo prompt template
         prompt_template = PromptTemplate(
-            input_variables=["user_message", "available_agents", "current_time"],
+            input_variables=["user_message", "available_agents"],
             template=f"""
-{formatted_root_instruction}
-
-**Thông Tin Hiện Tại:**
-- Thời gian: {{current_time}}
-- Các Agent khả dụng: {{available_agents}}
+{ROOT_INSTRUCTION}
 
 **Message từ User:**
 {{user_message}}
@@ -118,9 +108,7 @@ class HostServer:
         try:
             # Chuẩn bị thông tin cho orchestrator
             available_agents = await self.a2a_client_manager.get_available_agents()
-            
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+
             # Lấy context từ chat history nếu có session_id
             context_info = ""
             if session_id:
@@ -134,8 +122,7 @@ class HostServer:
             # Gọi orchestrator chain để phân tích
             orchestrator_response = await self.orchestrator_chain.ainvoke({
                 "user_message": message + context_info,
-                "available_agents": ", ".join(available_agents),
-                "current_time": current_time
+                "available_agents": ", ".join(available_agents)
             })
             
             logger.info(f"🤖 Orchestrator response: {orchestrator_response}")
@@ -146,7 +133,7 @@ class HostServer:
             # Xử lý theo decision
             clarified_message = decision.get("clarified_message", message)
             
-            if decision.get("selected_agent") and decision["selected_agent"] != "null":
+            if decision.get("selected_agent") and  ["selected_agent"] != "null":
                 # Gửi message đã được làm rõ tới agent được chọn qua A2A
                 agent_response = await self.a2a_client_manager.send_message_to_agent(
                     agent_name=decision["selected_agent"],
@@ -157,14 +144,11 @@ class HostServer:
                 
                 agent_response_data = self.parse_agent_response(agent_response)
                 
+                print(f"Agent response: {agent_response}")
+                
                 # Lưu tin nhắn gốc và clarified message vào chat history
                 chat_history = await self._save_user_message_to_history(message, clarified_message, user_id, session_id)
-                if chat_history:
-                    chat_history.add_message("assistant", agent_response_data["text"], decision["selected_agent"])
-                    # Lưu vào Redis nếu có user_id
-                    if user_id:
-                        await self.a2a_client_manager._save_chat_history_to_redis(user_id, session_id, chat_history)
-                
+
                 return {    
                     "response": agent_response_data["text"],
                     "agent_used": decision["selected_agent"],
@@ -179,12 +163,7 @@ class HostServer:
                 
                 # Lưu tin nhắn gốc và clarified message vào chat history
                 chat_history = await self._save_user_message_to_history(message, clarified_message, user_id, session_id)
-                if chat_history:
-                    chat_history.add_message("assistant", direct_response, "Host Agent")
-                    # Lưu vào Redis nếu có user_id
-                    if user_id:
-                        await self.a2a_client_manager._save_chat_history_to_redis(user_id, session_id, chat_history)
-                
+                                
                 return {
                     "response": direct_response,
                     "agent_used": None,
@@ -215,9 +194,7 @@ class HostServer:
         try:
             # Chuẩn bị thông tin cho orchestrator
             available_agents = await self.a2a_client_manager.get_available_agents()
-            
-            current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            
+                        
             # Lấy context từ chat history nếu có session_id
             context_info = ""
             if session_id:
@@ -240,8 +217,7 @@ class HostServer:
             full_message = message + context_info + files_info
             orchestrator_response = await self.orchestrator_chain.ainvoke({
                 "user_message": full_message,
-                "available_agents": ", ".join(available_agents),
-                "current_time": current_time
+                "available_agents": ", ".join(available_agents)
             })
             
             logger.info(f"🤖 Orchestrator response (with files): {orchestrator_response}")
@@ -359,11 +335,13 @@ class HostServer:
             original_message_content += f" [Đính kèm: {', '.join(file_names)}]"
         
         # Lưu tin nhắn gốc trước
-        chat_history.add_message("user", original_message_content, user_id=user_id)
-        
-        # Lưu clarified message nếu khác với tin nhắn gốc
-        if clarified_message != original_message:
-            chat_history.add_message("system", f"Clarified: {clarified_message}", user_id=user_id)
+        chat_history.add_message(
+            role="user", 
+            content=original_message_content, 
+            clarified_content=clarified_message, 
+            agent_used=None, 
+            user_id=user_id
+        )
         
         # Lưu vào Redis nếu có user_id
         if user_id:
