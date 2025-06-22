@@ -11,14 +11,15 @@ fastapi
 uvicorn
 
 # Database (if needed)
-sqlalchemy
-psycopg2-binary
+mysql-connector-python
+pymongo
 
 # Other utilities
 python-dotenv
 click
 httpx
 pydantic
+pydantic-settings
 
 # Logging and monitoring
 structlog

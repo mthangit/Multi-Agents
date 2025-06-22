@@ -1,0 +1,28 @@
+# Core dependencies for HostAgent
+asyncio
+httpx
+nest-asyncio
+python-dotenv
+
+# Redis for chat history storage
+redis[hiredis]>=4.5.0
+
+# FastAPI dependencies
+fastapi
+uvicorn
+pydantic
+
+# LangChain dependencies
+langchain
+langchain-openai
+langchain-google-genai
+langchain-core
+
+# Google AI SDK dependencies  
+google-genai
+
+# A2A SDK for agent communication
+a2a-sdk
+
+python-multipart
+

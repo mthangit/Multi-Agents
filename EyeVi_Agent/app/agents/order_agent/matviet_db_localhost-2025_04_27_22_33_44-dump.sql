@@ -38,7 +38,7 @@ CREATE TABLE `users` (
 
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
-INSERT INTO `users` (`id`, `name`, `email`, `is_admin`, `email_verified_at`, `created_at`, `updated_at`) VALUES (14,'string','user@example.com',0,NULL,'2025-02-13 14:34:33','2025-02-13 14:34:33'),(17,'Hoàng Mạnh Thắng','21521428@gm.uit.edu.vn',0,NULL,'2025-02-13 14:57:25','2025-02-13 14:57:25');
+INSERT INTO `users` (`id`, `name`, `email`, `phone`, `address`, `created_at`, `updated_at`) VALUES (1,'Hoàng Mạnh Thắng','21521428@gm.uit.edu.vn','0909090909','1234567890','2025-02-13 14:57:25','2025-02-13 14:57:25');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 
