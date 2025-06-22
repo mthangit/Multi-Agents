@@ -1,15 +1,47 @@
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, TypedDict, AsyncGenerator
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.schema import HumanMessage, SystemMessage, AIMessage
+from langgraph.graph import StateGraph, END
+from langgraph.graph.message import add_messages
+from langchain_core.messages import BaseMessage
 from config import Config, EYEWEAR_KEYWORDS
 import re
+import asyncio
+import json
+from datetime import datetime
+
+# Định nghĩa State cho LangGraph
+class RAGState(TypedDict):
+    """State cho RAG workflow với LangGraph"""
+    # Input
+    query: str
+    user_context: Dict[str, Any]
+    
+    # Processing
+    intent_info: Dict[str, Any]
+    query_embedding: Optional[List[float]]
+    retrieved_documents: List[Dict]
+    relevant_documents: List[Dict]
+    context: str
+    
+    # Output
+    answer: str
+    sources: List[str]
+    confidence_score: float
+    
+    # Metadata
+    messages: List[BaseMessage]
+    step: str
+    processing_time: float
+    status: str
+    error: Optional[str]
 
 class RAGAgent:
     def __init__(self):
         """
-        Khởi tạo RAG Agent với Google Gemini cho domain mắt kính
+        Khởi tạo RAG Agent với LangGraph workflow và streaming support
         """
-        print(f"🤖 Đang khởi tạo RAG Agent cho domain: {Config.DOMAIN}")
+        print(f"🤖 Đang khởi tạo RAG Agent với LangGraph cho domain: {Config.DOMAIN}")
         print(f"🤖 Đang khởi tạo Gemini model: {Config.GEMINI_MODEL}")
         
         self.llm = ChatGoogleGenerativeAI(
@@ -19,7 +51,291 @@ class RAGAgent:
             google_api_key=Config.GOOGLE_API_KEY
         )
         
-        print("✅ RAG Agent đã sẵn sàng!")
+        # Khởi tạo các managers (sẽ được inject từ workflow)
+        self.embedding_manager = None
+        self.qdrant_manager = None
+        
+        # Tạo LangGraph workflow
+        self.workflow = self._create_workflow()
+        self.compiled_workflow = self.workflow.compile()
+        
+        print("✅ RAG Agent với LangGraph đã sẵn sàng!")
+    
+    def set_managers(self, embedding_manager, qdrant_manager):
+        """Inject các managers cần thiết"""
+        self.embedding_manager = embedding_manager
+        self.qdrant_manager = qdrant_manager
+    
+    def _create_workflow(self) -> StateGraph:
+        """Tạo LangGraph workflow cho RAG process"""
+        workflow = StateGraph(RAGState)
+        
+        # Thêm các nodes
+        workflow.add_node("detect_intent", self.detect_intent_node)
+        workflow.add_node("retrieve_documents", self.retrieve_documents_node)
+        workflow.add_node("filter_documents", self.filter_documents_node)
+        workflow.add_node("aggregate_context", self.aggregate_context_node)
+        workflow.add_node("generate_answer", self.generate_answer_node)
+        workflow.add_node("post_process", self.post_process_node)
+        workflow.add_node("handle_error", self.handle_error_node)
+        
+        # Định nghĩa entry point
+        workflow.set_entry_point("detect_intent")
+        
+        # Định nghĩa edges
+        workflow.add_edge("detect_intent", "retrieve_documents")
+        workflow.add_edge("retrieve_documents", "filter_documents")
+        workflow.add_edge("filter_documents", "aggregate_context")
+        workflow.add_edge("aggregate_context", "generate_answer")
+        workflow.add_edge("generate_answer", "post_process")
+        workflow.add_edge("post_process", END)
+        workflow.add_edge("handle_error", END)
+        
+        return workflow
+    
+    def detect_intent_node(self, state: RAGState) -> RAGState:
+        """Node phân tích intent của câu hỏi"""
+        try:
+            state["step"] = "Phân tích intent"
+            state["messages"] = add_messages(state.get("messages", []), 
+                                           [HumanMessage(content=f"Đang phân tích intent cho: {state['query']}")])
+            
+            intent_info = self.detect_query_intent(state["query"])
+            state["intent_info"] = intent_info
+            state["status"] = "intent_detected"
+            
+            return state
+        except Exception as e:
+            state["error"] = f"Lỗi phân tích intent: {str(e)}"
+            state["status"] = "error"
+            return state
+    
+    def retrieve_documents_node(self, state: RAGState) -> RAGState:
+        """Node truy xuất documents từ vector store"""
+        try:
+            state["step"] = "Truy xuất documents"
+            state["messages"] = add_messages(state.get("messages", []), 
+                                           [HumanMessage(content="Đang tìm kiếm thông tin liên quan...")])
+            
+            if not self.embedding_manager or not self.qdrant_manager:
+                raise Exception("Embedding manager hoặc Qdrant manager chưa được thiết lập")
+            
+            # Tạo embedding cho query
+            query_embedding = self.embedding_manager.embed_query(state["query"])
+            state["query_embedding"] = query_embedding
+            
+            # Tìm kiếm documents
+            retrieved_docs = self.qdrant_manager.search_documents(
+                query_embedding, 
+                limit=Config.MAX_RETRIEVAL_DOCS
+            )
+            state["retrieved_documents"] = retrieved_docs
+            state["status"] = "documents_retrieved"
+            
+            return state
+        except Exception as e:
+            state["error"] = f"Lỗi truy xuất documents: {str(e)}"
+            state["status"] = "error"
+            return state
+    
+    def filter_documents_node(self, state: RAGState) -> RAGState:
+        """Node lọc và đánh giá documents"""
+        try:
+            state["step"] = "Lọc documents"
+            state["messages"] = add_messages(state.get("messages", []), 
+                                           [HumanMessage(content="Đang đánh giá độ liên quan của tài liệu...")])
+            
+            relevant_docs = self.grade_retrieved_documents(state["query"], state["retrieved_documents"])
+            state["relevant_documents"] = relevant_docs
+            state["status"] = "documents_filtered"
+            
+            return state
+        except Exception as e:
+            state["error"] = f"Lỗi lọc documents: {str(e)}"
+            state["status"] = "error"
+            return state
+    
+    def aggregate_context_node(self, state: RAGState) -> RAGState:
+        """Node tổng hợp context từ documents"""
+        try:
+            state["step"] = "Tổng hợp context"
+            state["messages"] = add_messages(state.get("messages", []), 
+                                           [HumanMessage(content="Đang tổng hợp thông tin...")])
+            
+            context = self.aggregate_context(state["relevant_documents"])
+            enhanced_context = self.enhance_context_with_keywords(context, state["intent_info"])
+            
+            state["context"] = enhanced_context
+            state["sources"] = list(set([doc["source"] for doc in state["relevant_documents"]]))
+            state["status"] = "context_aggregated"
+            
+            return state
+        except Exception as e:
+            state["error"] = f"Lỗi tổng hợp context: {str(e)}"
+            state["status"] = "error"
+            return state
+    
+    def generate_answer_node(self, state: RAGState) -> RAGState:
+        """Node tạo câu trả lời với LLM"""
+        try:
+            state["step"] = "Tạo câu trả lời"
+            state["messages"] = add_messages(state.get("messages", []), 
+                                           [HumanMessage(content="Đang tạo câu trả lời...")])
+            
+            # Tạo prompt domain-specific
+            prompt = self.create_domain_prompt(state["query"], state["context"], state["intent_info"])
+            
+            # Gọi LLM
+            response = self.llm.invoke(prompt)
+            answer = response.content if hasattr(response, 'content') else str(response)
+            
+            state["answer"] = answer
+            state["confidence_score"] = 0.8  # Có thể tính toán dựa trên context quality
+            state["status"] = "answer_generated"
+            
+            return state
+        except Exception as e:
+            state["error"] = f"Lỗi tạo câu trả lời: {str(e)}"
+            state["status"] = "error"
+            return state
+    
+    def post_process_node(self, state: RAGState) -> RAGState:
+        """Node xử lý hậu kỳ response"""
+        try:
+            state["step"] = "Hoàn thiện"
+            
+            # Post-process response
+            final_answer = self.post_process_response(state["answer"], state["intent_info"])
+            state["answer"] = final_answer
+            
+            # Thêm AI message vào conversation
+            state["messages"] = add_messages(state.get("messages", []), 
+                                           [AIMessage(content=final_answer)])
+            
+            state["status"] = "completed"
+            state["processing_time"] = 0.0  # Sẽ được tính ở workflow level
+            
+            return state
+        except Exception as e:
+            state["error"] = f"Lỗi xử lý hậu kỳ: {str(e)}"
+            state["status"] = "error"
+            return state
+    
+    def handle_error_node(self, state: RAGState) -> RAGState:
+        """Node xử lý lỗi"""
+        error_message = f"Xin lỗi, tôi gặp lỗi khi xử lý câu hỏi: {state.get('error', 'Lỗi không xác định')}"
+        
+        state["answer"] = error_message
+        state["messages"] = add_messages(state.get("messages", []), 
+                                       [AIMessage(content=error_message)])
+        state["status"] = "error_handled"
+        
+        return state
+    
+    async def stream(self, query: str, user_context: Dict = None) -> AsyncGenerator[Dict[str, Any], None]:
+        """
+        Stream processing với LangGraph
+        Yields từng bước xử lý của workflow
+        """
+        start_time = datetime.now()
+        
+        # Khởi tạo state
+        initial_state: RAGState = {
+            "query": query,
+            "user_context": user_context or {},
+            "intent_info": {},
+            "query_embedding": None,
+            "retrieved_documents": [],
+            "relevant_documents": [],
+            "context": "",
+            "answer": "",
+            "sources": [],
+            "confidence_score": 0.0,
+            "messages": [],
+            "step": "Bắt đầu",
+            "processing_time": 0.0,
+            "status": "started",
+            "error": None
+        }
+        
+        try:
+            # Stream từng bước của workflow
+            async for step_output in self.compiled_workflow.astream(initial_state):
+                # Tính thời gian xử lý
+                processing_time = (datetime.now() - start_time).total_seconds()
+                
+                # Cập nhật processing time
+                for node_name, node_state in step_output.items():
+                    if isinstance(node_state, dict):
+                        node_state["processing_time"] = processing_time
+                
+                # Yield update cho client
+                yield {
+                    "step": step_output,
+                    "timestamp": datetime.now().isoformat(),
+                    "processing_time": processing_time
+                }
+                
+                # Kiểm tra lỗi
+                for node_name, node_state in step_output.items():
+                    if isinstance(node_state, dict) and node_state.get("status") == "error":
+                        break
+            
+        except Exception as e:
+            yield {
+                "error": f"Lỗi workflow: {str(e)}",
+                "timestamp": datetime.now().isoformat(),
+                "processing_time": (datetime.now() - start_time).total_seconds()
+            }
+    
+    def invoke(self, query: str, user_context: Dict = None) -> Dict[str, Any]:
+        """
+        Invoke synchronous processing
+        """
+        initial_state: RAGState = {
+            "query": query,
+            "user_context": user_context or {},
+            "intent_info": {},
+            "query_embedding": None,
+            "retrieved_documents": [],
+            "relevant_documents": [],
+            "context": "",
+            "answer": "",
+            "sources": [],
+            "confidence_score": 0.0,
+            "messages": [],
+            "step": "Completed",
+            "processing_time": 0.0,
+            "status": "completed",
+            "error": None
+        }
+        
+        try:
+            start_time = datetime.now()
+            final_state = self.compiled_workflow.invoke(initial_state)
+            processing_time = (datetime.now() - start_time).total_seconds()
+            
+            return {
+                "answer": final_state.get("answer", ""),
+                "sources": final_state.get("sources", []),
+                "intent_info": final_state.get("intent_info", {}),
+                "relevant_documents_count": len(final_state.get("relevant_documents", [])),
+                "total_retrieved_count": len(final_state.get("retrieved_documents", [])),
+                "confidence_score": final_state.get("confidence_score", 0.0),
+                "processing_time": processing_time,
+                "status": final_state.get("status", "unknown")
+            }
+        except Exception as e:
+            return {
+                "answer": f"Lỗi xử lý: {str(e)}",
+                "sources": [],
+                "intent_info": {"query_type": "error"},
+                "relevant_documents_count": 0,
+                "total_retrieved_count": 0,
+                "confidence_score": 0.0,
+                "processing_time": 0.0,
+                "status": "error"
+            }
     
     def detect_query_intent(self, query: str) -> Dict[str, Any]:
         """
@@ -164,66 +480,6 @@ Lưu ý:
                 response += cta
         
         return response
-    
-    def generate_response(self, query: str, context: str) -> Dict[str, Any]:
-        """
-        Tạo response với logic domain-specific cho mắt kính
-        """
-        try:
-            # Phân tích intent
-            intent_info = self.detect_query_intent(query)
-            
-            # Tăng cường context
-            enhanced_context = self.enhance_context_with_keywords(context, intent_info)
-            
-            # Tạo prompt tối ưu
-            prompt = self.create_domain_prompt(query, enhanced_context, intent_info)
-            
-            # Gọi LLM
-            response = self.llm.invoke(prompt)
-            answer = response.content if hasattr(response, 'content') else str(response)
-            
-            # Post-process
-            final_answer = self.post_process_response(answer, intent_info)
-            
-            return {
-                "answer": final_answer,
-                "intent_info": intent_info,
-                "status": "success"
-            }
-            
-        except Exception as e:
-            return {
-                "answer": f"Xin lỗi, tôi gặp khó khăn khi xử lý câu hỏi về mắt kính. Lỗi: {str(e)}",
-                "intent_info": {"query_type": "error"},
-                "status": "error",
-                "error": str(e)
-            }
-    
-    def get_health_status(self) -> Dict[str, Any]:
-        """
-        Kiểm tra trạng thái health của RAG agent
-        """
-        try:
-            # Test simple query
-            test_response = self.llm.invoke("Test connection")
-            return {
-                "status": "healthy",
-                "model": Config.GEMINI_MODEL,
-                "domain": Config.DOMAIN,
-                "features": {
-                    "intent_detection": True,
-                    "domain_prompts": True,
-                    "medical_disclaimer": True,
-                    "product_recommendations": Config.ENABLE_PRODUCT_RECOMMENDATIONS,
-                    "technical_advice": Config.ENABLE_TECHNICAL_ADVICE
-                }
-            }
-        except Exception as e:
-            return {
-                "status": "unhealthy",
-                "error": str(e)
-            }
 
     def grade_retrieved_documents(self, query: str, documents: List[Dict]) -> List[Dict]:
         """
@@ -355,4 +611,76 @@ Hãy trả lời câu hỏi dựa trên ngữ cảnh trên. Định dạng trả
             "total_retrieved_count": len(retrieved_documents),
             "sources": list(set([doc["source"] for doc in relevant_docs])),
             "context": context
+        }
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """
+        Kiểm tra trạng thái health của RAG agent
+        """
+        try:
+            # Test simple query
+            test_response = self.llm.invoke("Test connection")
+            return {
+                "status": "healthy",
+                "model": Config.GEMINI_MODEL,
+                "domain": Config.DOMAIN,
+                "workflow_type": "LangGraph",
+                "features": {
+                    "intent_detection": True,
+                    "domain_prompts": True,
+                    "medical_disclaimer": True,
+                    "streaming_support": True,
+                    "langgraph_workflow": True,
+                    "product_recommendations": getattr(Config, 'ENABLE_PRODUCT_RECOMMENDATIONS', True),
+                    "technical_advice": getattr(Config, 'ENABLE_TECHNICAL_ADVICE', True)
+                },
+                "nodes": [
+                    "detect_intent",
+                    "retrieve_documents", 
+                    "filter_documents",
+                    "aggregate_context",
+                    "generate_answer",
+                    "post_process"
+                ]
+            }
+        except Exception as e:
+            return {
+                "status": "unhealthy",
+                "error": str(e),
+                "workflow_type": "LangGraph"
+            }
+
+    def generate_response(self, query: str, context: str) -> Dict[str, Any]:
+        """
+        Tạo response với logic domain-specific cho mắt kính (legacy method for compatibility)
+        """
+        try:
+            # Phân tích intent
+            intent_info = self.detect_query_intent(query)
+            
+            # Tăng cường context
+            enhanced_context = self.enhance_context_with_keywords(context, intent_info)
+            
+            # Tạo prompt tối ưu
+            prompt = self.create_domain_prompt(query, enhanced_context, intent_info)
+            
+            # Gọi LLM
+            response = self.llm.invoke(prompt)
+            answer = response.content if hasattr(response, 'content') else str(response)
+            
+            # Post-process
+            final_answer = self.post_process_response(answer, intent_info)
+            
+            return {
+                "answer": final_answer,
+                "intent_info": intent_info,
+                "status": "success"
+            }
+            
+        except Exception as e:
+            return {
+                "answer": f"Xin lỗi, tôi gặp khó khăn khi xử lý câu hỏi về mắt kính. Lỗi: {str(e)}",
+                "intent_info": {"query_type": "error"},
+                "status": "error",
+                "error": str(e)
         } 

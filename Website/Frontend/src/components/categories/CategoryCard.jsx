@@ -13,7 +13,7 @@ const CategoryCard = ({
   // Sử dụng useEffect để tải danh mục từ API khi component được tạo
   useEffect(() => {
     axios
-      .get("http://localhost:8000/api/categories") // Đảm bảo URL endpoint đúng
+      .get("http://34.87.90.190:8000/api/categories") // Đảm bảo URL endpoint đúng
       .then((response) => {
         // Lưu danh sách danh mục vào state
         setCategories(response.data.categories);

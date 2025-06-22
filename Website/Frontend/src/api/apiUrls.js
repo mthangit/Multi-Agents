@@ -1,4 +1,4 @@
-const baseUrl = "http://localhost:8000/api";
+const baseUrl = "http://34.87.90.190:8000/api";
 
 //auth url
 export const SIGNUP_URL = `${baseUrl}/signup`;

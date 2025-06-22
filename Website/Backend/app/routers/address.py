@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import logging
-from typing import List
+from typing import List, Dict, Any
 from app.database.database import get_db
 from app.schemas import address as address_schema
 from app.services import address_service
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/user/address", tags=["Address"])
 logger = logging.getLogger(__name__)
 
 
-@router.get("/get", response_model=dict)
+@router.get("/get", response_model=Dict[str, List[Dict[str, Any]]])
 def get_addresses(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
@@ -25,7 +25,7 @@ def get_addresses(
     return {"addresses": addresses}
 
 
-@router.post("", response_model=address_schema.Address)
+@router.post("", response_model=Dict[str, Any])
 def create_address(
     address: address_schema.AddressCreate,
     db: Session = Depends(get_db),
@@ -37,7 +37,7 @@ def create_address(
     return address_service.create_address(db, current_user.id, address)
 
 
-@router.put("/{address_id}", response_model=address_schema.Address)
+@router.put("/{address_id}", response_model=Dict[str, Any])
 def update_address(
     address_id: int,
     address: address_schema.AddressUpdate,
@@ -50,7 +50,7 @@ def update_address(
     return address_service.update_address(db, current_user.id, address_id, address)
 
 
-@router.delete("/{address_id}", response_model=dict)
+@router.delete("/{address_id}", response_model=Dict[str, Any])
 def delete_address(
     address_id: int,
     db: Session = Depends(get_db),

@@ -12,7 +12,7 @@ const Signup = () => {
   const { signingUp, isAuthenticated } = useAuthContext();
   const navigate = useNavigate();
   const [userDetails, setUserDetails] = useState({
-    name: "",
+    username: "",
     email: "",
     password: "",
   });
@@ -45,33 +45,43 @@ const Signup = () => {
 
     if (userDetails.password !== confirmPassword) {
       // Xử lý trường hợp mật khẩu không trùng khớp
-      console.error("Password mismatch");
+      notify("error", "Mật khẩu không trùng khớp!");
       return;
     }
-
+    
     try {
       // Sử dụng Axios để gửi yêu cầu đăng ký đến backend
       const response = await axios.post(
-        "http://localhost:8000/api/register",
+        "http://34.87.90.190:8000/api/signup",
         userDetails
       );
-      localStorage.setItem("token", response?.data?.access_token);
-      notify("success", "Đăng ký thành công!!");
-      navigate("/login");
-      // Xử lý kết quả trả về từ backend
-      // Đăng nhập người dùng sau khi đăng ký thành công
+      
+      if (response.status === 201 || response.status === 200) {
+        notify("success", "Đăng ký thành công!!");
+        
+        // Chuyển hướng đến trang đăng nhập sau khi đăng ký thành công
+        setTimeout(() => {
+          navigate("/login");
+        }, 1500);
+      }
     } catch (error) {
       console.error(error);
-      // Xử lý lỗi và hiển thị thông báo cho người dùng (ví dụ: email đã tồn tại, lỗi định dạng)
+      // Xử lý lỗi và hiển thị thông báo cho người dùng
       if (error.response) {
-        console.log("Server error message:", error.response.data);
+        if (error.response.status === 400) {
+          notify("error", "Email hoặc tên người dùng đã tồn tại!");
+        } else {
+          notify("error", error.response.data.detail || "Đăng ký thất bại!");
+        }
+      } else {
+        notify("error", "Không thể kết nối đến máy chủ!");
       }
     }
   };
 
   const isDisabled =
     signingUp ||
-    !userDetails.name ||
+    !userDetails.username ||
     !userDetails.email ||
     !userDetails.password ||
     !confirmPassword;
@@ -97,9 +107,9 @@ const Signup = () => {
                   required
                   placeholder="Username"
                   className="border rounded-md p-1.5 shadow-sm"
-                  value={userDetails.name}
+                  value={userDetails.username}
                   onChange={(e) =>
-                    setUserDetails({ ...userDetails, name: e.target.value })
+                    setUserDetails({ ...userDetails, username: e.target.value })
                   }
                 />
               </label>

@@ -22,7 +22,7 @@ class CartItem(CartItemBase):
     cart_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CartBase(BaseModel):
@@ -40,7 +40,7 @@ class Cart(CartBase):
     cart_details: List[CartItem] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class CartWithProducts(BaseModel):
@@ -51,4 +51,4 @@ class CartWithProducts(BaseModel):
     cart: List[ProductInCart] = []
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 

@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional
 import logging
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from ..prompts.search_prompts import INTENT_CLASSIFICATION_PROMPT
+from prompts.search_prompts import INTENT_CLASSIFICATION_PROMPT
 
 logger = logging.getLogger(__name__)
 

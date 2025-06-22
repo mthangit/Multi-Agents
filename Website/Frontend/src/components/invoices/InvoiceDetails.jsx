@@ -13,7 +13,7 @@ const InvoiceDetail = ({ invoiceId, onGoBack }) => {
       const fetchInvoiceDetail = async () => {
         try {
           const response = await axios.get(
-            `http://localhost:8000/api/user/getInvoices/${invoiceId}`,
+            `http://34.87.90.190:8000/api/user/getInvoices/${invoiceId}`,
             {
               headers: {
                 authorization: token,

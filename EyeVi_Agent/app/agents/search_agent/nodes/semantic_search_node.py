@@ -5,7 +5,7 @@ import json
 
 from qdrant_client import QdrantClient
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from ..data.filter_constants import (AVAILABLE_BRANDS)
+from data.filter_constants import (AVAILABLE_BRANDS)
 
 # Cấu hình logging chi tiết hơn
 logging.basicConfig(level=logging.INFO)
@@ -29,8 +29,8 @@ class SemanticSearchNode:
             default_limit: Số lượng kết quả mặc định trả về
         """
         try:
-            self.qdrant_client = QdrantClient("localhost", port=qdrant_port)
-            logger.info(f"Đã kết nối đến Qdrant tại {"localhost"}:{qdrant_port}")
+            self.qdrant_client = QdrantClient("http://eyevi.devsecopstech.click", port=qdrant_port)
+            logger.info(f"Đã kết nối đến Qdrant tại {"http://eyevi.devsecopstech.click"}:{qdrant_port}")
         except Exception as e:
             logger.error(f"Lỗi khi kết nối đến Qdrant: {e}")
             raise
@@ -59,6 +59,19 @@ class SemanticSearchNode:
         logger.info(f"Query chuẩn hóa: {normalized_query}")
         logger.info(f"Thuộc tính đã trích xuất: {extracted_attributes}")
         
+        # Kiểm tra và điều chỉnh search_type nếu cần
+        # Nếu search_type là combined nhưng không có text_embedding, chuyển thành image
+        if search_type == "combined" and not text_embedding:
+            logger.info("Điều chỉnh search_type từ 'combined' thành 'image' vì không có text_embedding")
+            search_type = "image"
+            state["search_type"] = "image"
+            
+        # Nếu search_type là combined nhưng không có image_embedding, chuyển thành text
+        elif search_type == "combined" and not image_embedding:
+            logger.info("Điều chỉnh search_type từ 'combined' thành 'text' vì không có image_embedding")
+            search_type = "text"
+            state["search_type"] = "text"
+        
         # Số lượng kết quả trả về
         limit = state.get("limit", self.default_limit)
         
@@ -72,33 +85,50 @@ class SemanticSearchNode:
             if search_type == "text" and text_embedding:
                 logger.info("Thực hiện tìm kiếm bằng text embedding")
                 results = self._search_by_text(text_embedding, limit, filter_params)
+                # Thêm thông tin search_type vào kết quả
+                for result in results:
+                    result["search_type"] = "text"
             elif search_type == "image" and image_embedding:
                 logger.info("Thực hiện tìm kiếm bằng image embedding")
                 results = self._search_by_image(image_embedding, limit, filter_params)
+                # Thêm thông tin search_type vào kết quả
+                for result in results:
+                    result["search_type"] = "image"
             elif search_type == "combined" and text_embedding and image_embedding:
                 logger.info("Thực hiện tìm kiếm kết hợp text và image embedding")
                 results = self._search_combined(
                     text_embedding, image_embedding, limit, filter_params
                 )
+                # Thêm thông tin search_type vào kết quả
+                for result in results:
+                    result["search_type"] = "combined"
             else:
                 logger.error(f"Loại tìm kiếm không hợp lệ hoặc thiếu embedding: {search_type}")
                 return {
                     "search_results": [],
-                    "error": "Loại tìm kiếm không hợp lệ hoặc thiếu embedding"
+                    "error": "Loại tìm kiếm không hợp lệ hoặc thiếu embedding",
+                    "search_type": search_type  # Thêm thông tin search_type vào kết quả lỗi
                 }
             
             logger.info(f"Tìm thấy {len(results)} kết quả cho loại tìm kiếm {search_type}")
             if results:
                 # Log một số kết quả đầu tiên
-                for i, result in enumerate(results[:3]):
+                for i, result in enumerate(results[:5]):
                     logger.info(f"Kết quả #{i+1}: {result.get('product_id')} - {result.get('name')} - Score: {result.get('score', 0)}")
             
-            return {"search_results": results}
+            return {
+                "search_results": results,
+                "search_type": search_type  # Thêm thông tin search_type vào kết quả
+            }
             
         except Exception as e:
             logger.error(f"Lỗi khi tìm kiếm: {e}")
             logger.error(f"Chi tiết lỗi: {traceback.format_exc()}")
-            return {"search_results": [], "error": str(e)}
+            return {
+                "search_results": [], 
+                "error": str(e),
+                "search_type": search_type  # Thêm thông tin search_type vào kết quả lỗi
+            }
     
     def _create_filter_params(self, attributes: Dict[str, Any]) -> Optional[Filter]:
         """
@@ -112,7 +142,7 @@ class SemanticSearchNode:
         """
         if not attributes:
             return None
-        
+
         conditions = []
         
         # Lọc theo brand
@@ -135,7 +165,8 @@ class SemanticSearchNode:
             conditions.append(
                 FieldCondition(key="brand", match=MatchValue(value=brand_value))
             )
-        
+        else:
+            return None
         # # Lọc theo gender
         # if "gender" in attributes and attributes["gender"]:
         #     gender_value = attributes["gender"]
@@ -202,15 +233,20 @@ class SemanticSearchNode:
         Returns:
             Danh sách kết quả tìm kiếm
         """
-        logger.info(json.dumps(filter_params.dict(), indent=2))
+        # Kiểm tra filter_params trước khi gọi dict()
+        if filter_params:
+            logger.info(json.dumps(filter_params.dict(), indent=2))
+        else:
+            logger.info("Không có filter_params")
+            
         search_results = self.qdrant_client.search(
-            collection_name="product_texts",
+            collection_name="text_products",
             query_vector=text_embedding,
             limit=limit,
             query_filter=filter_params
         )
         
-        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'product_texts'")
+        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'text_products'")
         return [hit.payload for hit in search_results]
     
     def _search_by_image(
@@ -230,14 +266,20 @@ class SemanticSearchNode:
         Returns:
             Danh sách kết quả tìm kiếm
         """
+        # Kiểm tra filter_params trước khi sử dụng
+        if filter_params:
+            logger.info(json.dumps(filter_params.dict(), indent=2))
+        else:
+            logger.info("Không có filter_params cho tìm kiếm image")
+            
         search_results = self.qdrant_client.search(
-            collection_name="product_images",
+            collection_name="image_products",
             query_vector=image_embedding,
             limit=limit,
             query_filter=filter_params
         )
         
-        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'product_images'")
+        logger.info(f"Tìm thấy {len(search_results)} kết quả từ collection 'image_products'")
         return [hit.payload for hit in search_results]
     
     def _search_combined(
@@ -265,12 +307,18 @@ class SemanticSearchNode:
         """
         from collections import defaultdict
         
+        # Kiểm tra filter_params trước khi sử dụng
+        if filter_params:
+            logger.info(json.dumps(filter_params.dict(), indent=2))
+        else:
+            logger.info("Không có filter_params cho tìm kiếm combined")
+        
         product_scores = defaultdict(float)
         product_details = {}
     
         # Tìm kiếm bằng text
         text_results = self.qdrant_client.search(
-            collection_name="product_texts",
+            collection_name="text_products",
             query_vector=text_embedding,
             limit=limit * 3,  # Tăng limit để có nhiều kết quả hơn
             query_filter=filter_params,
@@ -278,7 +326,7 @@ class SemanticSearchNode:
             score_threshold=0.0
         )
         
-        logger.info(f"Tìm thấy {len(text_results)} kết quả text từ collection 'product_texts'")
+        logger.info(f"Tìm thấy {len(text_results)} kết quả text từ collection 'text_products'")
         
         # Cộng điểm từ kết quả text (có trọng số)
         for hit in text_results:
@@ -289,9 +337,9 @@ class SemanticSearchNode:
                     product_details[product_id] = hit.payload
         
         # Tìm kiếm bằng image
-        logger.info(f"Tìm kiếm image trong collection 'product_images' với limit={limit*3}")
+        logger.info(f"Tìm kiếm image trong collection 'image_products' với limit={limit*3}")
         image_results = self.qdrant_client.search(
-            collection_name="product_images",
+            collection_name="image_products",
             query_vector=image_embedding,
             limit=limit * 3,
             query_filter=filter_params,
@@ -299,7 +347,7 @@ class SemanticSearchNode:
             score_threshold=0.0
         )
         
-        logger.info(f"Tìm thấy {len(image_results)} kết quả image từ collection 'product_images'")
+        logger.info(f"Tìm thấy {len(image_results)} kết quả image từ collection 'image_products'")
         
         # Cộng điểm từ kết quả image (có trọng số)
         for hit in image_results:

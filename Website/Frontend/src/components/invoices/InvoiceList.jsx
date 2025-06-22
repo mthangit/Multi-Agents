@@ -17,7 +17,7 @@ const InvoiceList = ({ onSelectInvoice }) => {
       const fetchInvoices = async () => {
         try {
           const response = await axios.get(
-            "http://localhost:8000/api/user/getInvoices",
+            "http://34.87.90.190:8000/api/user/getInvoices",
             {
               headers: {
                 authorization: token,

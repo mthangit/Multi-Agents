@@ -17,7 +17,7 @@ class WishlistItem(WishlistItemBase):
     wishlist_id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class WishlistBase(BaseModel):
@@ -34,7 +34,7 @@ class Wishlist(WishlistBase):
     wishlist_details: List[WishlistItem] = []
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class WishlistWithProducts(BaseModel):
@@ -44,4 +44,4 @@ class WishlistWithProducts(BaseModel):
     wishlist: List[Product] = []
 
     class Config:
-        orm_mode = True 
+        from_attributes = True 

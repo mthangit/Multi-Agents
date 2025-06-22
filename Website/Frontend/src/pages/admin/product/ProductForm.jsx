@@ -114,7 +114,7 @@ const ProductForm = () => {
       });
 
       axios
-        .post("http://localhost:8000/api/admin/addproduct", formData, {
+        .post("http://34.87.90.190:8000/api/admin/addproduct", formData, {
           onUploadProgress: (progressEvent) => {
             setProgress((prevState) => {
               return { ...prevState, pc: progressEvent.progress * 100 };

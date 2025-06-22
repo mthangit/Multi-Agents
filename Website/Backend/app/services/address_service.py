@@ -9,7 +9,26 @@ logger = logging.getLogger(__name__)
 
 def get_user_addresses(db: Session, user_id: int):
     """Lấy danh sách địa chỉ của người dùng"""
-    addresses = db.query(Address).filter(Address.user_id == user_id).all()
+    db_addresses = db.query(Address).filter(Address.user_id == user_id).all()
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    addresses = []
+    for address in db_addresses:
+        address_dict = {
+            "id": address.id,
+            "user_id": address.user_id,
+            "name": address.name,
+            "phone": address.phone,
+            "address": address.address,
+            "city": address.city,
+            "state": address.state,
+            "country": address.country,
+            "is_default": address.is_default,
+            "created_at": address.created_at,
+            "updated_at": address.updated_at
+        }
+        addresses.append(address_dict)
+    
     return addresses
 
 
@@ -22,19 +41,35 @@ def create_address(db: Session, user_id: int, address: address_schema.AddressCre
     # Tạo địa chỉ mới
     db_address = Address(
         user_id=user_id,
-        address_line=address.address_line,
+        name=address.name,
+        phone=address.phone,
+        address=address.address,
         city=address.city,
         state=address.state,
-        postal_code=address.postal_code,
         country=address.country,
-        phone=address.phone,
         is_default=address.is_default
     )
     
     db.add(db_address)
     db.commit()
     db.refresh(db_address)
-    return db_address
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    address_dict = {
+        "id": db_address.id,
+        "user_id": db_address.user_id,
+        "name": db_address.name,
+        "phone": db_address.phone,
+        "address": db_address.address,
+        "city": db_address.city,
+        "state": db_address.state,
+        "country": db_address.country,
+        "is_default": db_address.is_default,
+        "created_at": db_address.created_at,
+        "updated_at": db_address.updated_at
+    }
+    
+    return address_dict
 
 
 def update_address(db: Session, user_id: int, address_id: int, address: address_schema.AddressUpdate):
@@ -56,24 +91,40 @@ def update_address(db: Session, user_id: int, address_id: int, address: address_
         db.query(Address).filter(Address.user_id == user_id).update({"is_default": False})
     
     # Cập nhật thông tin địa chỉ
-    if address.address_line is not None:
-        db_address.address_line = address.address_line
+    if address.name is not None:
+        db_address.name = address.name
+    if address.phone is not None:
+        db_address.phone = address.phone
+    if address.address is not None:
+        db_address.address = address.address
     if address.city is not None:
         db_address.city = address.city
     if address.state is not None:
         db_address.state = address.state
-    if address.postal_code is not None:
-        db_address.postal_code = address.postal_code
     if address.country is not None:
         db_address.country = address.country
-    if address.phone is not None:
-        db_address.phone = address.phone
     if address.is_default is not None:
         db_address.is_default = address.is_default
     
     db.commit()
     db.refresh(db_address)
-    return db_address
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    address_dict = {
+        "id": db_address.id,
+        "user_id": db_address.user_id,
+        "name": db_address.name,
+        "phone": db_address.phone,
+        "address": db_address.address,
+        "city": db_address.city,
+        "state": db_address.state,
+        "country": db_address.country,
+        "is_default": db_address.is_default,
+        "created_at": db_address.created_at,
+        "updated_at": db_address.updated_at
+    }
+    
+    return address_dict
 
 
 def delete_address(db: Session, user_id: int, address_id: int):

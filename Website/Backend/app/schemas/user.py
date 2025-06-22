@@ -21,27 +21,26 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     password: Optional[str] = None
-    is_active: Optional[bool] = None
 
 
 class UserInDB(UserBase):
     id: int
-    is_active: bool
     is_admin: bool
+    email_verified_at: Optional[datetime] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class User(UserBase):
     id: int
-    is_active: bool
     is_admin: bool
+    email_verified_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class Token(BaseModel):

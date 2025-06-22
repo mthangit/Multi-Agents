@@ -9,7 +9,7 @@ const useAdminRedirect = () => {
   //console.log("userInfo.is_admin", userInfo.is_admin);
 
   useEffect(() => {
-    if (token && userInfo && userInfo.is_admin !== 1) {
+    if (token && userInfo && userInfo.is_admin !== true) {
       navigate("/");
     }
   }, [userInfo, navigate, token]);

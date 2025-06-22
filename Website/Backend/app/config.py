@@ -16,9 +16,9 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
     # Jaeger settings
-    JAEGER_HOST: str
-    JAEGER_PORT: int
-    JAEGER_ENABLED: bool
+    # JAEGER_HOST: str
+    # JAEGER_PORT: int
+    # JAEGER_ENABLED: bool
 
     class Config:
         env_file = ".env"

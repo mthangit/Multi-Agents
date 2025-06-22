@@ -4,8 +4,8 @@ import json
 import traceback
 from langchain_google_genai import ChatGoogleGenerativeAI
 
-from ..prompts.search_prompts import EXTRACT_QUERY
-from ..data.filter_constants import (
+from prompts.search_prompts import EXTRACT_QUERY
+from data.filter_constants import (
     AVAILABLE_COLORS, AVAILABLE_BRANDS, AVAILABLE_FRAME_SHAPES,
     AVAILABLE_FRAME_MATERIALS, AVAILABLE_GENDERS, AVAILABLE_CATEGORIES,
     AVAILABLE_FACE_SIZES, COLOR_MAPPING, get_normalized_value
@@ -46,13 +46,26 @@ class AttributeExtractionNode:
         # Lấy query từ state
         query = state.get("query", "")
         
+        # Lưu lại các giá trị quan trọng từ state ban đầu
+        # has_image = state.get("has_image")
+        # search_type = state.get("search_type")
+        # image_data = state.get("image_data")
+        
+        # Log các giá trị quan trọng
+        # logger.info(f"AttributeExtractionNode - has_image: {has_image}")
+        # logger.info(f"AttributeExtractionNode - search_type: {search_type}")
+        # logger.info(f"AttributeExtractionNode - image_data exists: {image_data is not None}")
+        
         # Kiểm tra nếu query rỗng
         if not query:
             logger.warning("Query rỗng, không thể trích xuất thuộc tính")
-            return {
-                "extracted_attributes": {},
-                "normalized_query": ""
+            result = {
+                "text_extracted_attributes": {},
+                "text_normalized_query": ""
             }
+            # Giữ lại các giá trị quan trọng
+            self._preserve_important_values(result, state)
+            return result
         
         try:
             # Sửa lỗi format string - Thay thế trực tiếp {query} trong prompt
@@ -62,13 +75,13 @@ class AttributeExtractionNode:
             response = self.llm.invoke(formatted_prompt)
             
             # Log phản hồi từ LLM
-            logger.info(f"Phản hồi từ LLM:\n{response.content[:200]}...")
+            # logger.info(f"Phản hồi từ LLM:\n{response.content[:200]}...")
             
             # Phân tích kết quả JSON
             result = self._parse_extraction_result(response.content)
             
             # Log kết quả sau khi parse
-            logger.info(f"Kết quả sau khi parse JSON:\n{result}")
+            # logger.info(f"Kết quả sau khi parse JSON:\n{result}")
             
             # Chuẩn hóa các giá trị thuộc tính
             normalized_attributes = self._normalize_attributes(result.get("slots", {}))
@@ -76,21 +89,43 @@ class AttributeExtractionNode:
             logger.info(f"Đã trích xuất thuộc tính: {normalized_attributes}")
             logger.info(f"Câu mô tả chuẩn hóa: {result.get('normalized_description', query)}")
             
-            # Cập nhật state với thuộc tính đã trích xuất
-            return {
-                "extracted_attributes": normalized_attributes,
-                "normalized_query": result.get("normalized_description", query)
+            # Lưu kết quả vào các biến tạm thời
+            text_normalized_query = result.get("normalized_description", query)
+            text_extracted_attributes = normalized_attributes
+            
+            # Kiểm tra nếu normalized_attributes rỗng thì trả về query gốc
+            if not normalized_attributes:
+                result = {
+                    "text_extracted_attributes": {},
+                    "text_normalized_query": query
+                }
+                # Giữ lại các giá trị quan trọng
+                self._preserve_important_values(result, state)
+                return result
+            
+            # Tạo kết quả với cả biến tạm thời
+            result = {
+                "text_extracted_attributes": text_extracted_attributes,
+                "text_normalized_query": text_normalized_query
             }
+            
+            # Giữ lại các giá trị quan trọng từ state ban đầu
+            self._preserve_important_values(result, state)
+            
+            return result
         
         except Exception as e:
             # Log stack trace đầy đủ
             logger.error(f"Lỗi khi trích xuất thuộc tính: {e}")
             logger.error(f"Chi tiết lỗi: {traceback.format_exc()}")
-            return {
-                "extracted_attributes": {},
-                "normalized_query": query,
+            result = {
+                "text_extracted_attributes": {},
+                "text_normalized_query": query,
                 "error": str(e)
             }
+            # Giữ lại các giá trị quan trọng
+            self._preserve_important_values(result, state)
+            return result
     
     def _parse_extraction_result(self, result_text: str) -> Dict[str, Any]:
         """
@@ -194,6 +229,24 @@ class AttributeExtractionNode:
             logger.error(f"Lỗi khi chuẩn hóa thuộc tính: {e}")
             logger.error(traceback.format_exc())
             return {}
+
+    def _preserve_important_values(self, result: Dict[str, Any], state: Dict[str, Any]) -> None:
+        """
+        Giữ lại các giá trị quan trọng từ state ban đầu.
+        
+        Args:
+            result: Dict kết quả sẽ được trả về
+            state: Dict trạng thái ban đầu
+        """
+        # Danh sách các key quan trọng cần giữ lại
+        important_keys = ["has_image", "search_type", "image_data", "original_query"]
+        
+        # Giữ lại các giá trị quan trọng
+        for key in important_keys:
+            if key in state and state[key] is not None:
+                result[key] = state[key]
+        
+        # logger.info(f"Đã giữ lại các giá trị quan trọng: has_image={result.get('has_image')}, search_type={result.get('search_type')}")
 
 # Hàm tiện ích để tạo node
 def get_attribute_extraction_node(api_key: Optional[str] = None) -> AttributeExtractionNode:

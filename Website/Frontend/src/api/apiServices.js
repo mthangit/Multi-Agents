@@ -27,7 +27,7 @@ export const getAllInvoicesDetailsService = (invoiceID) =>
 export const getAllProductsService = () => axios.get(PRODUCTS_URL);
 
 export const getProductByIdService = (productId) =>
-  //axios.get(`http://localhost:8000/api/products/${productId}`);
+  //axios.get(`http://34.87.90.190:8000/api/products/${productId}`);
   axios.get(`${PRODUCTS_URL}/${productId}`);
 
 // export const getCartItemsService = (token) =>
@@ -41,7 +41,7 @@ export const getCartItemsService = (token) => {
   console.log("Token in Axios Request:", token); // In ra token để kiểm tra
   return axios.get(`${CART_URL}/get`, {
     headers: {
-      authorization: token,
+      Authorization: `Bearer ${token}`,
     },
   });
 };
@@ -52,10 +52,11 @@ export const postAddProductToCartService = (product, token) =>
     { product },
     {
       headers: {
-        authorization: token,
+        Authorization: `Bearer ${token}`,
       },
     }
   );
+
 export const postUpdateProductQtyCartService = (productId, type, token) => {
   console.log("ProductID of Update:", productId);
   return axios.post(
@@ -67,7 +68,7 @@ export const postUpdateProductQtyCartService = (productId, type, token) => {
     },
     {
       headers: {
-        authorization: token,
+        Authorization: `Bearer ${token}`,
       },
     }
   );
@@ -76,14 +77,14 @@ export const postUpdateProductQtyCartService = (productId, type, token) => {
 export const deleteProductFromCartService = (productId, token) =>
   axios.delete(`${CART_URL}/remove/${productId}`, {
     headers: {
-      authorization: token,
+      Authorization: `Bearer ${token}`,
     },
   });
 
 export const getWishlistItemsService = (token) =>
   axios.get(`${WISHLIST_URL}/get`, {
     headers: {
-      authorization: token,
+      Authorization: `Bearer ${token}`,
     },
   });
 
@@ -93,7 +94,7 @@ export const postAddProductToWishlistService = (product, token) =>
     { product },
     {
       headers: {
-        authorization: token,
+        Authorization: `Bearer ${token}`,
       },
     }
   );
@@ -101,7 +102,7 @@ export const postAddProductToWishlistService = (product, token) =>
 export const deleteProductFromWishlistService = (productId, token) =>
   axios.delete(`${WISHLIST_URL}/remove/${productId}`, {
     headers: {
-      authorization: token,
+      Authorization: `Bearer ${token}`,
     },
   });
 
@@ -113,7 +114,7 @@ export const postCashOnDeliveryService = (token) =>
     {},
     {
       headers: {
-        authorization: token,
+        Authorization: `Bearer ${token}`,
       },
     }
   );
@@ -127,7 +128,7 @@ export const processPaymentService = async (paymentMethod, token) => {
       },
       {
         headers: {
-          authorization: token,
+          Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }
@@ -150,7 +151,7 @@ export const placeOrderService = (orderData, paymentMethod, token) => {
   const headers = token
     ? {
         headers: {
-          authorization: token,
+          Authorization: `Bearer ${token}`,
         },
       }
     : {};
@@ -167,25 +168,59 @@ export const placeOrderService = (orderData, paymentMethod, token) => {
   );
 };
 
-export const newAddresses = (data, token) => {
-  axios.post(`http://localhost:8000/api/user/address`, data, {
-    headers: {
-      authorization: token,
-    },
-  });
+export const newAddresses = async (data, token) => {
+  try {
+    const response = await axios.post(`http://34.87.90.190:8000/api/user/address`, data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error creating address:", error);
+    throw error;
+  }
+};
+
+export const updateAddressById = async (addressId, data, token) => {
+  try {
+    const response = await axios.put(`http://34.87.90.190:8000/api/user/address/${addressId}`, data, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error updating address:", error);
+    throw error;
+  }
+};
+
+export const deleteAddressById = async (addressId, token) => {
+  try {
+    const response = await axios.delete(`http://34.87.90.190:8000/api/user/address/${addressId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error deleting address:", error);
+    throw error;
+  }
 };
 
 export const getAllAddressesService = async (token) => {
   try {
     const response = await axios.get(
-      "http://localhost:8000/api/user/address/get",
+      "http://34.87.90.190:8000/api/user/address/get",
       {
         headers: {
-          Authorization: token,
+          Authorization: `Bearer ${token}`,
         },
       }
     );
-    return response;
+    return response.data;
   } catch (error) {
     console.error("Error fetching addresses:", error);
     throw error;
@@ -193,4 +228,4 @@ export const getAllAddressesService = async (token) => {
 };
 
 export const postAddProduct = (product) =>
-  axios.post(`http://localhost:8000/api/admin/addproduct`, { product });
+  axios.post(`http://34.87.90.190:8000/api/admin/addproduct`, { product });

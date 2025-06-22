@@ -21,7 +21,7 @@ def create_user(db: Session, user: user_schema.UserCreate):
         )
     
     # Kiểm tra username đã tồn tại chưa
-    db_user = db.query(User).filter(User.username == user.username).first()
+    db_user = db.query(User).filter(User.name == user.username).first()
     if db_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -31,16 +31,25 @@ def create_user(db: Session, user: user_schema.UserCreate):
     # Tạo người dùng mới
     hashed_password = get_password_hash(user.password)
     db_user = User(
-        username=user.username,
+        name=user.username,
         email=user.email,
-        hashed_password=hashed_password,
-        is_active=True,
+        password=hashed_password,
         is_admin=False
     )
     db.add(db_user)
     db.commit()
     db.refresh(db_user)
-    return db_user
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    user_dict = {
+        "id": db_user.id,
+        "username": db_user.name,
+        "email": db_user.email,
+        "is_admin": db_user.is_admin,
+        "email_verified_at": db_user.email_verified_at
+    }
+    
+    return user_dict
 
 
 def authenticate_user(db: Session, email: str, password: str):
@@ -48,7 +57,7 @@ def authenticate_user(db: Session, email: str, password: str):
     user = db.query(User).filter(User.email == email).first()
     if not user:
         return False
-    if not verify_password(password, user.hashed_password):
+    if not verify_password(password, user.password):
         return False
     return user
 
@@ -66,7 +75,7 @@ def login_user(db: Session, user_data: user_schema.UserLogin):
     # Tạo access token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username, "id": user.id},
+        data={"sub": user.name, "id": user.id},
         expires_delta=access_token_expires
     )
     
@@ -74,7 +83,7 @@ def login_user(db: Session, user_data: user_schema.UserLogin):
         "encodedToken": access_token,
         "foundUser": {
             "id": user.id,
-            "username": user.username,
+            "username": user.name,
             "email": user.email,
             "is_admin": user.is_admin
         }
@@ -94,7 +103,21 @@ def get_user_by_id(db: Session, user_id: int):
 
 def get_all_users(db: Session, skip: int = 0, limit: int = 100):
     """Lấy danh sách người dùng"""
-    return db.query(User).offset(skip).limit(limit).all()
+    db_users = db.query(User).offset(skip).limit(limit).all()
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict phù hợp với schema
+    users = []
+    for user in db_users:
+        user_dict = {
+            "id": user.id,
+            "username": user.name,  # Chuyển name thành username
+            "email": user.email,
+            "is_admin": user.is_admin,
+            "email_verified_at": user.email_verified_at
+        }
+        users.append(user_dict)
+    
+    return users
 
 
 def update_user(db: Session, user_id: int, user_data: user_schema.UserUpdate):
@@ -103,14 +126,22 @@ def update_user(db: Session, user_id: int, user_data: user_schema.UserUpdate):
     
     # Cập nhật thông tin
     if user_data.username is not None:
-        db_user.username = user_data.username
+        db_user.name = user_data.username
     if user_data.email is not None:
         db_user.email = user_data.email
     if user_data.password is not None:
-        db_user.hashed_password = get_password_hash(user_data.password)
-    if user_data.is_active is not None:
-        db_user.is_active = user_data.is_active
+        db_user.password = get_password_hash(user_data.password)
     
     db.commit()
     db.refresh(db_user)
-    return db_user 
+    
+    # Chuyển đổi từ đối tượng SQLAlchemy sang dict
+    user_dict = {
+        "id": db_user.id,
+        "username": db_user.name,
+        "email": db_user.email,
+        "is_admin": db_user.is_admin,
+        "email_verified_at": db_user.email_verified_at
+    }
+    
+    return user_dict 
