@@ -59,6 +59,19 @@ class SemanticSearchNode:
         logger.info(f"Query chuẩn hóa: {normalized_query}")
         logger.info(f"Thuộc tính đã trích xuất: {extracted_attributes}")
         
+        # Kiểm tra và điều chỉnh search_type nếu cần
+        # Nếu search_type là combined nhưng không có text_embedding, chuyển thành image
+        if search_type == "combined" and not text_embedding:
+            logger.info("Điều chỉnh search_type từ 'combined' thành 'image' vì không có text_embedding")
+            search_type = "image"
+            state["search_type"] = "image"
+            
+        # Nếu search_type là combined nhưng không có image_embedding, chuyển thành text
+        elif search_type == "combined" and not image_embedding:
+            logger.info("Điều chỉnh search_type từ 'combined' thành 'text' vì không có image_embedding")
+            search_type = "text"
+            state["search_type"] = "text"
+        
         # Số lượng kết quả trả về
         limit = state.get("limit", self.default_limit)
         
@@ -72,33 +85,50 @@ class SemanticSearchNode:
             if search_type == "text" and text_embedding:
                 logger.info("Thực hiện tìm kiếm bằng text embedding")
                 results = self._search_by_text(text_embedding, limit, filter_params)
+                # Thêm thông tin search_type vào kết quả
+                for result in results:
+                    result["search_type"] = "text"
             elif search_type == "image" and image_embedding:
                 logger.info("Thực hiện tìm kiếm bằng image embedding")
                 results = self._search_by_image(image_embedding, limit, filter_params)
+                # Thêm thông tin search_type vào kết quả
+                for result in results:
+                    result["search_type"] = "image"
             elif search_type == "combined" and text_embedding and image_embedding:
                 logger.info("Thực hiện tìm kiếm kết hợp text và image embedding")
                 results = self._search_combined(
                     text_embedding, image_embedding, limit, filter_params
                 )
+                # Thêm thông tin search_type vào kết quả
+                for result in results:
+                    result["search_type"] = "combined"
             else:
                 logger.error(f"Loại tìm kiếm không hợp lệ hoặc thiếu embedding: {search_type}")
                 return {
                     "search_results": [],
-                    "error": "Loại tìm kiếm không hợp lệ hoặc thiếu embedding"
+                    "error": "Loại tìm kiếm không hợp lệ hoặc thiếu embedding",
+                    "search_type": search_type  # Thêm thông tin search_type vào kết quả lỗi
                 }
             
             logger.info(f"Tìm thấy {len(results)} kết quả cho loại tìm kiếm {search_type}")
             if results:
                 # Log một số kết quả đầu tiên
-                for i, result in enumerate(results[:3]):
+                for i, result in enumerate(results[:5]):
                     logger.info(f"Kết quả #{i+1}: {result.get('product_id')} - {result.get('name')} - Score: {result.get('score', 0)}")
             
-            return {"search_results": results}
+            return {
+                "search_results": results,
+                "search_type": search_type  # Thêm thông tin search_type vào kết quả
+            }
             
         except Exception as e:
             logger.error(f"Lỗi khi tìm kiếm: {e}")
             logger.error(f"Chi tiết lỗi: {traceback.format_exc()}")
-            return {"search_results": [], "error": str(e)}
+            return {
+                "search_results": [], 
+                "error": str(e),
+                "search_type": search_type  # Thêm thông tin search_type vào kết quả lỗi
+            }
     
     def _create_filter_params(self, attributes: Dict[str, Any]) -> Optional[Filter]:
         """

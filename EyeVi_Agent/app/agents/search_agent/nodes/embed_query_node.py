@@ -68,31 +68,42 @@ class EmbedQueryNode:
         normalized_query = state.get("normalized_query", "")
         image_data = state.get("image_data")
         
-        # Kiểm tra loại tìm kiếm
-        has_text = bool(normalized_query)
-        has_image = bool(image_data)
+        # Xác định loại tìm kiếm nếu chưa được đặt
+        if "search_type" not in state or not state["search_type"]:
+            has_text = bool(normalized_query and normalized_query.strip())
+            has_image = bool(image_data)
+            
+            if has_text and has_image:
+                search_type = "combined"
+            elif has_image:
+                search_type = "image"
+            else:
+                search_type = "text"
+            
+            state["search_type"] = search_type
+            logger.info(f"Đã xác định loại tìm kiếm: {search_type}")
+        else:
+            search_type = state["search_type"]
+            logger.info(f"Sử dụng loại tìm kiếm đã đặt: {search_type}")
         
         # Khởi tạo kết quả
         result = {
-            "search_type": None,
+            "search_type": search_type,
             "text_embedding": None,
             "image_embedding": None
         }
         
         try:
             # Tìm kiếm bằng text
-            if has_text and not has_image:
-                result["search_type"] = "text"
+            if search_type == "text":
                 result["text_embedding"] = self._embed_text(normalized_query)
                 
             # Tìm kiếm bằng image
-            elif has_image and not has_text:
-                result["search_type"] = "image"
+            elif search_type == "image":
                 result["image_embedding"] = self._embed_image(image_data)
                 
             # Tìm kiếm kết hợp
-            elif has_text and has_image:
-                result["search_type"] = "combined"
+            elif search_type == "combined":
                 result["text_embedding"] = self._embed_text(normalized_query)
                 result["image_embedding"] = self._embed_image(image_data)
                 

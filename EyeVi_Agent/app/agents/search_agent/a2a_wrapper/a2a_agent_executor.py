@@ -2,7 +2,7 @@ import logging
 import asyncio
 import base64
 import json
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 
 from a2a.server.agent_execution import AgentExecutor, RequestContext
 from a2a.server.events import EventQueue
@@ -14,8 +14,10 @@ from a2a.types import (
     Task,
     TaskState,
     TextPart,
-    UnsupportedOperationError,
+    FilePart,
+    DataPart,
     Message,
+    UnsupportedOperationError,
 )
 from a2a.utils import (
     new_agent_text_message,
@@ -53,14 +55,14 @@ class SearchAgentExecutor(AgentExecutor):
         updater = TaskUpdater(event_queue, task.id, task.contextId)
 
         try:
-            # Get user input from context
-            query = context.get_user_input()
+            # Trích xuất dữ liệu từ message
+            query, image_data, analysis_result = self._extract_message_parts(context.message)
             
             # Process the search request
             result = await self.agent.search(
                 query=query,
-                image_data=None,  # Handle image data if needed
-                analysis_result=None  # Handle analysis result if needed
+                image_data=image_data,
+                analysis_result=analysis_result
             )
 
             # Format the response as text
@@ -253,4 +255,43 @@ class SearchAgentExecutor(AgentExecutor):
                 "error": str(e),
                 "search_agent_available": False,
                 "active_tasks": 0
-            } 
+            }
+
+    def _extract_message_parts(self, message: Message) -> Tuple[Optional[str], Optional[bytes], Optional[Dict]]:
+        """Trích xuất query text, image data và analysis result từ message parts.
+        
+        Args:
+            message: Message từ client
+            
+        Returns:
+            Tuple chứa (query_text, image_data, analysis_result)
+        """
+        query_text = None
+        image_data = None
+        analysis_result = None
+        
+        for part in message.parts:
+            if hasattr(part, 'root'):
+                part_root = part.root
+                
+                # TextPart - Xử lý phần văn bản
+                if isinstance(part_root, TextPart):
+                    query_text = part_root.text
+                    logger.info(f"Extracted text query: {query_text[:50]}...")
+                
+                # FilePart - Xử lý phần file (ảnh)
+                elif isinstance(part_root, FilePart) and part_root.file.mimeType.startswith("image/"):
+                    try:
+                        # Decode base64 image data
+                        if part_root.file.bytes:
+                            image_data = base64.b64decode(part_root.file.bytes)
+                            logger.info(f"Extracted image data: {len(image_data)} bytes")
+                    except Exception as e:
+                        logger.error(f"Error decoding image data: {str(e)}")
+                
+                # DataPart - Xử lý phần dữ liệu cấu trúc
+                elif isinstance(part_root, DataPart):
+                    analysis_result = part_root.data
+                    logger.info(f"Extracted analysis result: {analysis_result}")
+        
+        return query_text, image_data, analysis_result 
