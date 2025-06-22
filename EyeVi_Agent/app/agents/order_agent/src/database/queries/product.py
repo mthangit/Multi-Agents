@@ -18,35 +18,30 @@ class ProductQuery:
     
     def get_product_by_id(self, product_id: int) -> Optional[Dict]:
         """
-        Get a product by its ID.
-        
+        Lấy thông tin sản phẩm theo ID.
         Args:
-            product_id (int): The ID of the product to retrieve
-            
+            product_id (int): ID sản phẩm
         Returns:
-            Optional[Dict]: The product data as a dictionary, or None if not found
+            Optional[Dict]: Thông tin sản phẩm hoặc None nếu không tìm thấy
         """
         try:
             cursor = self.db.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM products WHERE _id = %s", (product_id,))
+            cursor.execute("SELECT * FROM products WHERE id = %s", (product_id,))
             result = cursor.fetchone()
             cursor.close()
             return result
         except Exception as e:
             logger.error(f"Error getting product by ID {product_id}: {str(e)}")
-            # Re-establish connection if needed
             self.db = self.db_connection.connect()
             raise
 
     def get_product_by_name(self, name: str) -> List[Dict]:
         """
-        Get products matching a name pattern.
-        
+        Lấy danh sách sản phẩm theo tên (tìm kiếm gần đúng).
         Args:
-            name (str): The name pattern to search for
-            
+            name (str): Tên sản phẩm cần tìm
         Returns:
-            List[Dict]: A list of matching products
+            List[Dict]: Danh sách sản phẩm phù hợp
         """
         try:
             cursor = self.db.cursor(dictionary=True)
@@ -56,6 +51,5 @@ class ProductQuery:
             return result
         except Exception as e:
             logger.error(f"Error getting products by name '{name}': {str(e)}")
-            # Re-establish connection if needed
             self.db = self.db_connection.connect()
             raise 

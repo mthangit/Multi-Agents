@@ -36,7 +36,7 @@ class DatabaseConnection:
                 database=settings.DB_NAME,
                 port=settings.DB_PORT,
                 pool_size=5,  # Connection pool size
-                pool_name="order_agents_pool",
+                pool_name="eyevi_db_pool",
                 autocommit=True
             )
             logger.info("MySQL database connection established successfully")

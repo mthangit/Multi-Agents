@@ -1,60 +1,103 @@
 from src.database.connection import DatabaseConnection
-from src.database.queries.cart import CartQuery
+from src.database.queries.user import UserQuery
 from typing import Optional, Dict, List
 
 class OrderQuery:
     def __init__(self):
         self.db = DatabaseConnection().connect()
-        self.cart_query = CartQuery()
+        self.user_query = UserQuery()
     
-    def create_order_from_cart(self, user_id: int, shipping_address: str, phone: str, payment_method: str) -> Optional[int]:
-        """Tạo đơn hàng từ giỏ hàng, bao gồm kiểm tra hàng tồn kho"""
+    def create_order(self, user_id: int, items: List[Dict], shipping_address: str = "", phone: str = "", payment_method: str = "COD") -> Optional[int]:
+        """
+        Tạo đơn hàng trực tiếp từ danh sách sản phẩm, bao gồm kiểm tra hàng tồn kho
+        Args:
+            user_id: ID người dùng
+            items: Danh sách sản phẩm [{'product_id': int, 'quantity': int}, ...]
+            shipping_address: Địa chỉ giao hàng (nếu trống sẽ lấy từ user)
+            phone: Số điện thoại (nếu trống sẽ lấy từ user)
+            payment_method: Phương thức thanh toán
+        Returns:
+            Optional[int]: ID đơn hàng mới tạo hoặc None nếu thất bại
+        """
         cursor = self.db.cursor()
         try:
-            # 1. Lấy giỏ hàng hiện tại
-            cart_items = self.cart_query.get_cart_items(user_id)
-            if not cart_items:
-                return None  # Giỏ hàng trống
+            if not items:
+                return None  # Không có sản phẩm
             
-            # 2. Kiểm tra tồn kho cho từng sản phẩm
-            for item in cart_items:
-                if item['quantity'] > item['stock']:
-                    raise Exception(f"Sản phẩm '{item['name']}' không đủ hàng (chỉ còn {item['stock']})")
+            # 1. Lấy thông tin user
+            user = self.user_query.get_user_by_id(user_id)
+            if not user:
+                raise Exception(f"Người dùng ID {user_id} không tồn tại")
             
-            # 3. Tính tổng giá trị đơn hàng
-            total_amount = sum(item['total_price'] for item in cart_items)
+            # 2. Sử dụng thông tin user nếu không có shipping_address hoặc phone
+            final_shipping_address = shipping_address.strip() if shipping_address.strip() else user.get('address', 'Thủ Đức, TP.HCM')
+            final_phone = phone.strip() if phone.strip() else user.get('phone', '0901234567')
+                        
+            # 3. Kiểm tra tồn kho và tính tổng cho từng sản phẩm
+            validated_items = []
+            total_items = 0
+            total_price = 0
             
-            # 4. Tạo đơn hàng mới
+            for item in items:
+                product_id = item.get('product_id')
+                quantity = item.get('quantity', 1)
+                
+                # Lấy thông tin sản phẩm
+                cursor.execute(
+                    "SELECT id, name, price, stock FROM products WHERE id = %s",
+                    (product_id,)
+                )
+                product = cursor.fetchone()
+                
+                if not product:
+                    raise Exception(f"Sản phẩm ID {product_id} không tồn tại")
+                
+                product_id, name, price, stock = product
+                
+                if quantity > stock:
+                    raise Exception(f"Sản phẩm '{name}' không đủ hàng (chỉ còn {stock})")
+                
+                validated_items.append({
+                    'product_id': product_id,
+                    'name': name,
+                    'price': price,
+                    'quantity': quantity
+                })
+                
+                total_items += quantity
+                total_price += price * quantity
+            
+            actual_price = total_price  # Có thể áp dụng giảm giá sau
+            
+            # 4. Tạo đơn hàng mới với thông tin user
             cursor.execute(
                 """
-                INSERT INTO orders (user_id, total_amount, shipping_address, phone, payment_method, status)
-                VALUES (%s, %s, %s, %s, %s, %s)
+                INSERT INTO orders (user_id, total_items, total_price, actual_price, shipping_address, phone, order_status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
                 """,
-                (user_id, total_amount, shipping_address, phone, payment_method, 'pending')
+                (user_id, total_items, total_price, actual_price, final_shipping_address, final_phone, 'pending')
             )
             order_id = cursor.lastrowid
             
-            # 5. Thêm chi tiết đơn hàng
-            for item in cart_items:
+            # 5. Thêm chi tiết đơn hàng và cập nhật tồn kho
+            for item in validated_items:
                 cursor.execute(
                     """
-                    INSERT INTO order_items (order_id, product_id, quantity, price)
+                    INSERT INTO order_details (order_id, product_id, quantity, price)
                     VALUES (%s, %s, %s, %s)
                     """,
                     (order_id, item['product_id'], item['quantity'], item['price'])
                 )
                 
-                # 6. Cập nhật số lượng tồn kho
+                # Cập nhật số lượng tồn kho
                 cursor.execute(
                     "UPDATE products SET stock = stock - %s WHERE id = %s",
                     (item['quantity'], item['product_id'])
                 )
             
-            # 7. Xóa giỏ hàng sau khi đặt hàng thành công
-            self.cart_query.clear_cart(user_id)
-            
             self.db.commit()
             return order_id
+            
         except Exception as e:
             self.db.rollback()
             raise e
@@ -84,10 +127,10 @@ class OrderQuery:
         # Lấy chi tiết đơn hàng
         cursor.execute(
             """
-            SELECT oi.*, p.name as product_name, p.description as product_description
-            FROM order_items oi
-            JOIN products p ON oi.product_id = p.id
-            WHERE oi.order_id = %s
+            SELECT od.*, p.name as product_name, p.description as product_description
+            FROM order_details od
+            JOIN products p ON od.product_id = p.id
+            WHERE od.order_id = %s
             """,
             (order_id,)
         )
@@ -96,6 +139,31 @@ class OrderQuery:
         
         cursor.close()
         return order
+    
+    def get_orders_by_user_id(self, user_id: int, limit: int = 10) -> List[Dict]:
+        """
+        Lấy danh sách đơn hàng của user
+        Args:
+            user_id: ID người dùng
+            limit: Số lượng đơn hàng tối đa (mặc định 10)
+        Returns:
+            List[Dict]: Danh sách đơn hàng
+        """
+        cursor = self.db.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT o.*, u.name as user_name, u.email as user_email
+            FROM orders o
+            JOIN users u ON o.user_id = u.id
+            WHERE o.user_id = %s
+            ORDER BY o.created_at DESC
+            LIMIT %s
+            """,
+            (user_id, limit)
+        )
+        orders = cursor.fetchall()
+        cursor.close()
+        return orders
     
     def check_stock(self, product_id: int) -> Optional[Dict]:
         """Kiểm tra tồn kho của sản phẩm"""

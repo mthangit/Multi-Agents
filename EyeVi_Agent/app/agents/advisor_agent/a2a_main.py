@@ -134,7 +134,7 @@ def main(host, port, skip_checks):
 
         # Create agent card with specialized eyewear consultation info
         agent_card = AgentCard(
-            name='Advisor Agent - Chuyên gia tư vấn mắt kính',
+            name='Advisor Agent',
             description='Agent tư vấn chuyên sâu về mắt kính, sử dụng cơ sở dữ liệu kiến thức chuyên ngành để đưa ra lời khuyên chính xác và hữu ích về các vấn đề liên quan đến mắt kính, quang học và thị lực',
             url=f'http://{host}:{port}/',
             version='1.0.0',
@@ -179,4 +179,4 @@ def main(host, port, skip_checks):
 
 
 if __name__ == '__main__':
-    main() 
+    main()
