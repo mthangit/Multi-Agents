@@ -8,7 +8,8 @@ from prompts.search_prompts import (
     SEARCH_RESPONSE_PROMPT,
     SEARCH_RESPONSE_IMAGE_PROMPT,
     SEARCH_RESPONSE_NO_RESULTS_PROMPT,
-    SEARCH_RESPONSE_IRRELEVANT_IMAGE_PROMPT
+    SEARCH_RESPONSE_IRRELEVANT_IMAGE_PROMPT,
+    SEARCH_RESPONSE_COMBINED_PROMPT
 )
 
 # Cấu hình logging
@@ -49,6 +50,15 @@ class FormatResponseNode:
         original_query = state.get("original_query", "")  # Lấy query gốc của người dùng
         search_type = state.get("search_type", "text")
         image_analysis = state.get("image_analysis", {})
+        text_normalized_query = state.get("text_normalized_query", "")
+        image_normalized_query = state.get("image_normalized_query", "")
+        
+        logger.info(f"Định dạng phản hồi cho loại tìm kiếm: {search_type}")
+        logger.info(f"Query gốc: {original_query}")
+        logger.info(f"Query chuẩn hóa: {normalized_query}")
+        logger.info(f"Text normalized query: {text_normalized_query}")
+        logger.info(f"Image normalized query: {image_normalized_query}")
+        logger.info(f"Số lượng kết quả: {len(search_results)}")
         
         try:
             # Kiểm tra nếu có lỗi
@@ -86,6 +96,15 @@ class FormatResponseNode:
                     search_results, 
                     image_analysis,
                     original_query
+                )
+            elif search_type == "combined":
+                logger.info("Sử dụng prompt cho tìm kiếm kết hợp")
+                llm_response = self._generate_combined_search_response(
+                    search_results,
+                    original_query,
+                    text_normalized_query,
+                    image_normalized_query,
+                    image_analysis
                 )
             else:
                 logger.info("Sử dụng prompt cho tìm kiếm bằng văn bản")
@@ -201,6 +220,58 @@ class FormatResponseNode:
         except Exception as e:
             logger.error(f"Lỗi khi tạo phản hồi cho tìm kiếm hình ảnh: {e}")
             return f"Tìm thấy {len(search_results)} sản phẩm phù hợp với hình ảnh bạn đã gửi."
+    
+    def _generate_combined_search_response(
+        self,
+        search_results: List[Dict[str, Any]],
+        original_query: str,
+        text_query: str,
+        image_query: str,
+        image_analysis: Dict[str, Any]
+    ) -> str:
+        """
+        Tạo phản hồi cho tìm kiếm kết hợp (text + image).
+        
+        Args:
+            search_results: Danh sách kết quả tìm kiếm
+            original_query: Câu truy vấn gốc của người dùng
+            text_query: Query từ phân tích text
+            image_query: Query từ phân tích image
+            image_analysis: Kết quả phân tích hình ảnh
+            
+        Returns:
+            Phản hồi dạng văn bản
+        """
+        try:
+            # Kiểm tra xem hình ảnh có chứa kính mắt không
+            contains_eyewear = image_analysis.get("contains_eyewear", False)
+            
+            if not contains_eyewear:
+                # Nếu hình ảnh không chứa kính mắt, sử dụng kết quả tìm kiếm văn bản
+                logger.info("Hình ảnh không chứa kính mắt, sử dụng kết quả tìm kiếm văn bản")
+                return self._generate_text_search_response(search_results, original_query)
+            
+            # Giới hạn số lượng sản phẩm để đưa vào prompt
+            limited_results = search_results[:5]
+            logger.info(f"Kết quả tìm kiếm: {limited_results}")
+            # Tạo prompt cho tìm kiếm kết hợp
+            prompt = SEARCH_RESPONSE_COMBINED_PROMPT.format(
+                user_query=original_query,
+                text_query=text_query,
+                image_query=image_query,
+                image_analysis=json.dumps(image_analysis, ensure_ascii=False, indent=2),
+                products=json.dumps(limited_results, ensure_ascii=False, indent=2)
+            )
+            
+            # Gọi LLM
+            response = self.llm.invoke(prompt)
+            logger.info("Đã nhận phản hồi từ LLM cho tìm kiếm kết hợp")
+            
+            return response.content
+            
+        except Exception as e:
+            logger.error(f"Lỗi khi tạo phản hồi cho tìm kiếm kết hợp: {e}")
+            return f"Tìm thấy {len(search_results)} sản phẩm phù hợp với yêu cầu kết hợp của bạn."
     
     def _generate_no_results_response(self, query: str, search_type: str) -> str:
         """

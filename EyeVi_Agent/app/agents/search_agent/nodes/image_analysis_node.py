@@ -47,10 +47,30 @@ class ImageAnalysisNode:
         # Lấy dữ liệu hình ảnh từ state
         image_data = state.get("image_data")
         
+        # Lấy kết quả phân tích từ text nếu có
+        # text_normalized_query = state.get("text_normalized_query", "")
+        # text_extracted_attributes = state.get("text_extracted_attributes", {})
+        
+        # # Lưu lại các giá trị quan trọng từ state ban đầu
+        # has_image = state.get("has_image")
+        # search_type = state.get("search_type")
+        
+        # # Log các giá trị quan trọng
+        # logger.info(f"ImageAnalysisNode - has_image: {has_image}")
+        # logger.info(f"ImageAnalysisNode - search_type: {search_type}")
+        # logger.info(f"ImageAnalysisNode - text_normalized_query: {text_normalized_query}")
+        
         # Kiểm tra nếu không có dữ liệu hình ảnh
         if not image_data:
             logger.warning("Không có dữ liệu hình ảnh, bỏ qua phân tích")
-            return state  # Trả về state không thay đổi, không thêm normalized_query
+            # Trả về kết quả với các biến tạm thời trống
+            result = {
+                "image_normalized_query": "",
+                "image_extracted_attributes": {}
+            }
+            # Giữ lại các giá trị quan trọng
+            self._preserve_important_values(result, state)
+            return result
         
         try:
             # Tạo hash đơn giản từ image_data để làm key cho cache
@@ -59,49 +79,56 @@ class ImageAnalysisNode:
             # Kiểm tra cache
             if image_hash in self._cache:
                 logger.info("Sử dụng kết quả phân tích từ cache")
-                result = self._cache[image_hash]
+                cached_result = self._cache[image_hash]
+                
+                # Tạo kết quả từ cache
+                result = {
+                    "image_analysis": cached_result.get("image_analysis"),
+                    "image_normalized_query": cached_result.get("image_normalized_query", ""),
+                    "image_extracted_attributes": cached_result.get("image_extracted_attributes", {})
+                }
             else:
                 # Phân tích hình ảnh
                 image_analysis = self._analyze_image(image_data)
                 
                 # Tạo normalized_query và extracted_attributes chỉ khi hình ảnh có chứa kính mắt
                 if image_analysis.get("contains_eyewear", False):
-                    normalized_query = self._create_query_from_analysis(image_analysis)
-                    extracted_attributes = self._create_attributes_from_analysis(image_analysis)
+                    image_normalized_query = self._create_query_from_analysis(image_analysis)
+                    image_extracted_attributes = self._create_attributes_from_analysis(image_analysis)
                 else:
-                    normalized_query = ""
-                    extracted_attributes = {}
+                    image_normalized_query = ""
+                    image_extracted_attributes = {}
                 
                 # Tạo kết quả
                 result = {
                     "image_analysis": image_analysis,
-                    "extracted_attributes": extracted_attributes
+                    "image_normalized_query": image_normalized_query,
+                    "image_extracted_attributes": image_extracted_attributes
                 }
-                
-                # Chỉ thêm normalized_query khi hình ảnh có chứa kính mắt
-                if image_analysis.get("contains_eyewear", False):
-                    result["normalized_query"] = normalized_query
                 
                 # Lưu vào cache
                 self._cache[image_hash] = result
             
-            # Cập nhật state với kết quả phân tích
-            state["image_analysis"] = result.get("image_analysis")
+            # Giữ lại các giá trị quan trọng từ state ban đầu
+            self._preserve_important_values(result, state)
             
-            # Chỉ đặt normalized_query và extracted_attributes khi hình ảnh có chứa kính mắt
-            if result.get("image_analysis", {}).get("contains_eyewear", False):
-                if "normalized_query" in result:
-                    state["normalized_query"] = result["normalized_query"]
-                if "extracted_attributes" in result:
-                    state["extracted_attributes"] = result["extracted_attributes"]
-            
-            return state
+            return result
             
         except Exception as e:
             logger.error(f"Lỗi khi phân tích hình ảnh: {e}")
             logger.error(f"Chi tiết lỗi: {traceback.format_exc()}")
-            state["error"] = f"Lỗi khi phân tích hình ảnh: {str(e)}"
-            return state
+            result = {
+                "image_analysis": {
+                    "contains_eyewear": False,
+                    "error": str(e)
+                },
+                "image_normalized_query": "",
+                "image_extracted_attributes": {},
+                "error": f"Lỗi khi phân tích hình ảnh: {str(e)}"
+            }
+            # Giữ lại các giá trị quan trọng
+            self._preserve_important_values(result, state)
+            return result
     
     def _get_image_hash(self, image_data: str) -> str:
         """
@@ -154,7 +181,7 @@ class ImageAnalysisNode:
             )
             
             response = self.llm.invoke([message])
-            logger.info("Đã nhận phản hồi từ Gemini Vision")
+            # logger.info("Đã nhận phản hồi từ Gemini Vision")
             
             # Phân tích kết quả JSON
             result = self._parse_analysis_result(response.content)
@@ -268,7 +295,7 @@ class ImageAnalysisNode:
         """
         # Kiểm tra nếu hình ảnh có chứa kính mắt
         if not image_analysis.get("contains_eyewear", False):
-            return "kính mắt"
+            return ""
         
         # Lấy thông tin từ eyewear_description
         eyewear_desc = image_analysis.get("eyewear_description", {})
@@ -369,6 +396,27 @@ class ImageAnalysisNode:
         logger.info(f"Đã tạo extracted_attributes từ phân tích hình ảnh: {attributes}")
         
         return attributes
+
+    def _preserve_important_values(self, result: Dict[str, Any], state: Dict[str, Any]) -> None:
+        """
+        Giữ lại các giá trị quan trọng từ state ban đầu.
+        
+        Args:
+            result: Dict kết quả sẽ được trả về
+            state: Dict trạng thái ban đầu
+        """
+        # Danh sách các key quan trọng cần giữ lại
+        important_keys = [
+            "has_image", "search_type", "image_data", "original_query", 
+            "text_normalized_query", "text_extracted_attributes"
+        ]
+        
+        # Giữ lại các giá trị quan trọng
+        for key in important_keys:
+            if key in state and state[key] is not None:
+                result[key] = state[key]
+        
+        # logger.info(f"Đã giữ lại các giá trị quan trọng: has_image={result.get('has_image')}, search_type={result.get('search_type')}")
 
 # Hàm tiện ích để tạo node
 def get_image_analysis_node(api_key: Optional[str] = None) -> ImageAnalysisNode:
