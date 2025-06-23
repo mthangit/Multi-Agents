@@ -116,7 +116,7 @@ class AdvisorAgentClient:
             }
                     
         else:
-            print(f"📨 Sending message to advisor agent...")
+            print(f"📨 Sending message to search agent...")
             
             # Create non-streaming request
             request = SendMessageRequest(
@@ -348,7 +348,7 @@ async def demo_queries():
 async def interactive_mode():
     """Interactive chat mode with advisor agent."""
     print("=" * 60)
-    print("💬 INTERACTIVE MODE: ADVISOR AGENT A2A")
+    print("💬 INTERACTIVE MODE: SEARCH AGENT A2A")
     print("=" * 60)
     
     client = AdvisorAgentClient()
