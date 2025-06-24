@@ -10,11 +10,14 @@ Order Agent hỗ trợ **4 chức năng cốt lõi**:
 3. **🛒 Thêm vào giỏ hàng** - Quản lý cart và đơn hàng
 4. **🛍️ Tạo đơn hàng** - Đặt hàng với thông tin giao hàng
 
+## 📖 Tài liệu thêm
+
+- **[OrderSystem.md](order_system.md)**: Chi tiết hệ thống order
+
 ## 📋 Kiến trúc
 
-```
-User Input → LangGraph Workflow → Tools → Database → Response
-```
+![Kiến trúc hệ thống](OrderAgent.png)
+
 
 **Simplified Architecture:**
 - **2 Nodes**: `assistant` + `tools`

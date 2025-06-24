@@ -9,6 +9,8 @@ Một hệ thống thông minh có khả năng hiểu câu hỏi của người 
 
 ### Kiến trúc Tách biệt (Mới)
 
+![Kiến trúc hệ thống](docs/RAG.png)
+
 1. **📥 Data Ingestion Script** (`ingest_data.py`)
    - Xử lý PDF từ thư mục `data/` → Embedding → Vector DB
    - Chỉ chạy khi có dữ liệu mới
@@ -467,9 +469,13 @@ def handle_request(user_query):
 
 ## 📖 Tài liệu thêm
 
-- **[USAGE.md](USAGE.md)**: Hướng dẫn sử dụng chi tiết
-- **[examples/](examples/)**: Ví dụ sử dụng cụ thể
-- **[document.md](document.md)**: Tài liệu workflow gốc
+- **[USAGE.md](docs/USAGE.md)**: Hướng dẫn sử dụng chi tiết
+- **[document.md](docs/document.md)**: Tài liệu workflow gốc
+- **[EMBEDDING_GUIDE.md](docs/EMBEDDING_GUIDE.md)**: Hướng dẫn embedding, lựa chọn mô hình
+- **[EYEWEAR_DOMAIN_GUIDE.md](docs/EYEWEAR_DOMAIN_GUIDE.md)**: Hướng dẫn tối ưu hóa cho domain mắt kính
+- **[EYEWEAR_DOMAIN_GUIDE.md](docs/EYEWEAR_DOMAIN_GUIDE.md)**: Hướng dẫn tối ưu hóa cho domain mắt kính
+- **[README_A2A.md](docs/README_A2A.md)**: Tài liệu A2A cho advisor agent
+
 
 ## 📜 License
 
