@@ -1,136 +1,132 @@
-# Hệ thống Multi-Agent RAG
+# EyeVi Agent - Hệ thống Multi-Agent RAG cho Mua sắm Mắt kính
 
-Hệ thống tìm kiếm sản phẩm dựa trên text hoặc ảnh đầu vào, sử dụng mô hình CLIP đã fine-tuning kết hợp với vector database Qdrant và công nghệ Multi-Agent của Google ADK.
+EyeVi Agent là một hệ thống Multi-Agent sử dụng kỹ thuật Retrieval Augmented Generation (RAG) để hỗ trợ mua sắm mắt kính trực tuyến. Hệ thống này được thiết kế để tìm kiếm, tư vấn và xử lý đơn hàng mắt kính dựa trên các mô hình ngôn ngữ lớn (LLM).
 
-## Tính năng
+## Tổng quan hệ thống
 
-- Tìm kiếm sản phẩm bằng văn bản
-- Tìm kiếm sản phẩm bằng ảnh
-- Sử dụng model CLIP đã fine-tuning
-- Kết nối với vector database Qdrant
-- Hệ thống multi-agent với Google ADK
-- API RESTful với FastAPI
+EyeVi Agent kết hợp nhiều agent chuyên biệt để tạo thành một hệ thống tư vấn mua sắm toàn diện:
 
-## Cài đặt
+- **Search Agent**: Tìm kiếm sản phẩm mắt kính bằng văn bản hoặc hình ảnh
+- **Advisor Agent**: Tư vấn lựa chọn mắt kính phù hợp với người dùng
+- **Order Agent**: Xử lý và theo dõi đơn hàng
+- **Host Agent**: Quản lý tương tác với người dùng
+- **Orchestrator Agent**: Điều phối luồng làm việc giữa các agent
 
-### Yêu cầu
-
-- Python 3.9+
-- Qdrant server đã được cài đặt và khởi chạy
-- Google API key
-
-### Cài đặt các thư viện
-
-```bash
-pip install -r requirements.txt
-```
-
-### Cấu hình môi trường
-
-Tạo file `.env` từ file `.env.example`:
-
-```bash
-cp .env.example .env
-```
-
-Chỉnh sửa các biến trong file `.env`:
+## Cấu trúc thư mục
 
 ```
-GOOGLE_API_KEY=your_google_api_key_here
-QDRANT_HOST=localhost
-QDRANT_PORT=6333
-VECTOR_SIZE=512
-TEXT_COLLECTION_NAME=text_products
-IMAGE_COLLECTION_NAME=image_products
+EyeVi_Agent/
+├── app/                      # Mã nguồn chính của ứng dụng
+│   ├── agents/               # Các agent trong hệ thống
+│   │   ├── advisor_agent/    # Agent tư vấn lựa chọn mắt kính
+│   │   ├── host_agent/       # Agent quản lý tương tác người dùng
+│   │   ├── order_agent/      # Agent xử lý đơn hàng
+│   │   ├── orchestrator_agent/ # Agent điều phối
+│   │   └── search_agent/     # Agent tìm kiếm sản phẩm
+│   ├── common/               # Các thành phần dùng chung
+│   ├── config/               # Cấu hình hệ thống
+│   ├── database/             # Kết nối và xử lý cơ sở dữ liệu
+│   ├── hosts/                # Các host interface
+│   ├── models/               # Các mô hình ML và định nghĩa dữ liệu
+│   └── tools/                # Công cụ hỗ trợ cho các agent
+├── data/                     # Dữ liệu và tài nguyên
+├── .env                      # Biến môi trường (không nên commit)
+├── .env.example              # Mẫu file biến môi trường
+├── docker-compose.yml        # Cấu hình Docker Compose
+├── Dockerfile                # Cấu hình Docker
+├── requirements.txt          # Các thư viện phụ thuộc
+├── run.py                    # Script khởi chạy chính
+└── run.sh                    # Script hỗ trợ khởi chạy
 ```
 
-## Khởi chạy
+## Các Agent và chức năng
 
-```bash
-python run.py
-```
+### Search Agent
 
-Hoặc với các tham số tùy chỉnh:
+- **Chức năng**: Tìm kiếm sản phẩm mắt kính dựa trên văn bản hoặc hình ảnh
+- **Công nghệ**: Sử dụng mô hình CLIP đã fine-tuning kết hợp với vector database Qdrant
+- **Endpoint**: `/api/search/text` và `/api/search/image`
+- **Khởi chạy riêng**: `python -m app.agents.search_agent.run_server --host 0.0.0.0 --port 8001 --reload`
+- **[README.md](app/agents/search_agent/README.md)**: Tài liệu Search Agent
 
-```bash
-python run.py --host 0.0.0.0 --port 8000 --debug
-```
+### Advisor Agent
 
-## API Endpoints
+- **Chức năng**: Tư vấn lựa chọn mắt kính phù hợp với người dùng
+- **Công nghệ**: Sử dụng LLM để phân tích nhu cầu và đề xuất sản phẩm phù hợp
+- **Endpoint**: `/api/advisor`
+- **[README.md](app/agents/advisor_agent/README.md)**: Tài liệu Advidsor Agent
 
-### Tìm kiếm bằng văn bản
+### Order Agent
 
-```
-POST /api/search/text
-```
+- **Chức năng**: Xử lý đơn hàng, theo dõi trạng thái và cập nhật thông tin
+- **Công nghệ**: Tích hợp với cơ sở dữ liệu MySQL để lưu trữ và quản lý đơn hàng
+- **Endpoint**: `/api/order`
+- **[README.md](app/agents/order_agent/README.md)**: Tài liệu Order Agent
 
-Body:
-```json
-{
-  "query": "áo thun màu đen",
-  "filter_params": {
-    "category": "clothing"
-  }
-}
-```
+### Host Agent
 
-### Tìm kiếm bằng ảnh
+- **Chức năng**: Quản lý tương tác với người dùng, xử lý các yêu cầu ban đầu
+- **Công nghệ**: Sử dụng LLM để hiểu và phân loại yêu cầu của người dùng
+- **Endpoint**: `/api/host`
+- **[README.md](app/agents/host_agent/README.md)**: Tài liệu Order Agent
 
-```
-POST /api/search/image
-```
+## Cài đặt và Khởi chạy
 
-Form-data:
-- `image`: File ảnh
-- `query` (tuỳ chọn): Mô tả bổ sung
+### Yêu cầu hệ thống
 
-### Reset Agent
+- Python 3.12+
+- Docker và Docker Compose (cho triển khai container)
+- Google API key cho LLM
 
-```
-POST /api/reset
-```
+### Cài đặt thủ công
 
-## Cấu trúc dự án
+1. Sao chép file môi trường:
+   ```bash
+   cp .env.example .env
+   ```
 
-```
-.
-├── requirements.txt
-├── .env.example
-├── run.py
-├── README.md
-└── src/
-    ├── agents/
-    │   ├── base_agent.py
-    │   ├── text_search_agent.py
-    │   ├── image_search_agent.py
-    │   └── orchestrator.py
-    ├── api/
-    │   ├── app.py
-    │   ├── endpoints.py
-    │   └── models.py
-    ├── config/
-    │   └── settings.py
-    ├── database/
-    │   └── vector_store.py
-    ├── models/
-    │   └── clip_model.py
-    ├── tools/
-    │   └── search_tools.py
-    └── utils/
-        └── helpers.py
-```
+2. Cập nhật các biến môi trường trong file `.env`:
+   ```
+   GOOGLE_API_KEY=your_google_api_key_here
+   QDRANT_HOST=localhost
+   QDRANT_PORT=6333
+   ```
 
-## Phát triển
+3. Cài đặt các thư viện phụ thuộc:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### Thêm Agent mới
+4. Khởi chạy ứng dụng:
+   ```bash
+   python run.py
+   ```
+   
+   hoặc
+   
+   ```bash
+   ./run.sh
+   ```
 
-1. Tạo lớp agent mới kế thừa từ `BaseAgent`
-2. Định nghĩa system prompt và tools cần thiết
-3. Triển khai phương thức `process()`
-4. Đăng ký agent với `AgentOrchestrator`
+### Triển khai với Docker
 
-### Thêm Tool mới
+1. Sao chép và cấu hình file môi trường:
+   ```bash
+   cp .env.example .env
+   ```
 
-1. Tạo lớp Tool mới kế thừa từ `BaseTool` của LangChain
-2. Định nghĩa schema và phương thức `_run()`
-3. Đăng ký tool với agent thích hợp 
+2. Khởi chạy với Docker Compose:
+   ```bash
+   ./run_docker.sh
+   ```
+   
+   hoặc
+   
+   ```bash
+   docker-compose up -d
+   ```
+
+## Liên kết
+
+- [Mã nguồn trên GitHub](https://github.com/mthangit/Multi-Agents/tree/main/EyeVi_Agent)
+

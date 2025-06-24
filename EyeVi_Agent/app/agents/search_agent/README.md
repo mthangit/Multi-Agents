@@ -9,6 +9,13 @@ Agent tìm kiếm sản phẩm kính mắt sử dụng A2A protocol.
 - Tìm kiếm sản phẩm dựa trên phân tích khuôn mặt
 - Hỗ trợ giao thức A2A (Agent-to-Agent)
 
+
+## 📖 Tài liệu chi tiết
+
+- **[README_A2A.md](docs/README_A2A.md)**: Tài liệu A2A cho advisor agent
+- **[system.md](docs/system.md)**: Tài liệu chi tiết hệ thống search agent
+
+
 ## Cài đặt
 
 ```bash
