@@ -79,7 +79,7 @@ Thư mục chứa mã nguồn giao diện người dùng (UI) của hệ thống
 
   <summary>📊 Kết quả fine-tuning mô hình CLIP</summary>
   
-  | Cấu hình mô hình | Mean Cosine Similarity | Recall@1 | Recall@5 | MAP |
+  | Cấu hình mô hình | Recall@1 | Recall@5 | MAP | Mean Cosine Similarity |
   | :---------------- | :--------------------: | :------: | :------: | :-: |
   | CLIP gốc (ViT-B/32) | 0.044 | 0.123 | 0.029 | 0.247 |
   | LP + CLIP Loss gốc | 0.1896 | 0.5452 | 0.1591 | 0.2301 |
