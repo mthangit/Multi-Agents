@@ -17,6 +17,7 @@ Hệ thống được xây dựng theo kiến trúc đồ thị có trạng thá
 
 ## 2. Kiến trúc hệ thống
 ![Kiến trúc hệ thống](SearchAgnet.png)
+
 ### 2.1. Mô hình trạng thái (State Model)
 
 Toàn bộ thông tin trong quá trình xử lý được lưu trữ trong một đối tượng `SearchState`, cho phép các node chia sẻ và cập nhật thông tin. Các trường chính trong state bao gồm:
