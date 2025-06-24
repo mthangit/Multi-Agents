@@ -40,6 +40,12 @@ Hệ thống EyeVi bao gồm các thành phần chính:
 - **Vector Database**: Lưu trữ và tìm kiếm embeddings của sản phẩm
 - **MySQL Database**: Lưu trữ thông tin sản phẩm, đơn hàng và người dùng
 
+### Sơ đồ tuần tự của hệ thống
+<p align="center">
+  <img src="SequenceAll.jpeg" alt="Sơ đồ tuần tự của EyeVi">
+</p>
+
+
 ## CẤU TRÚC DỰ ÁN
 
 Dự án được tổ chức thành các thư mục chính:
@@ -58,53 +64,74 @@ Thư mục chứa mã nguồn giao diện người dùng (UI) của hệ thống
 - **[README.md](eyevi_ui/README.md)**: Hướng dẫn về giao diện người dùng
 - **[src/](eyevi_ui/src/)**: Mã nguồn chính của giao diện
 
-## HƯỚNG DẪN CÀI ĐẶT VÀ SỬ DỤNG
+## CÔNG NGHỆ SỬ DỤNG
 
-### Yêu cầu hệ thống
+### 🧠 Backend (EyeVi_Agent)
 
-- Python 3.9+
-- Node.js 18+
-- Docker và Docker Compose (cho triển khai container)
-- Google API key cho LLM
+#### 🔧 Ngôn ngữ và Framework
+- **Python 3.13**: Ngôn ngữ lập trình chính
+- **FastAPI**: Framework API RESTful hiệu năng cao
+- **Uvicorn**: ASGI server
 
-### Cài đặt và khởi chạy EyeVi_Agent
+#### 🤖 Mô hình AI
+- **Google Gemini**: Mô hình ngôn ngữ lớn (LLM) cho phân tích và tạo phản hồi
+- **CLIP**: Mô hình đa phương thức cho tìm kiếm kết hợp văn bản-hình ảnh
 
-1. Di chuyển vào thư mục EyeVi_Agent:
-   ```bash
-   cd EyeVi_Agent
-   ```
+  <summary>📊 Kết quả fine-tuning mô hình CLIP</summary>
+  
+  | Cấu hình mô hình | Mean Cosine Similarity | Recall@1 | Recall@5 | MAP |
+  | :---------------- | :--------------------: | :------: | :------: | :-: |
+  | CLIP gốc (ViT-B/32) | 0.044 | 0.123 | 0.029 | 0.247 |
+  | LP + CLIP Loss gốc | 0.1896 | 0.5452 | 0.1591 | 0.2301 |
+  | LP + 0.5·L2 | 0.1985 | 0.5568 | 0.1642 | 0.2217 |
+  | LP + 0.5·L2 + 0.3·L3 | 0.1422 | 0.4237 | 0.1241 | 0.2383 |
+  | LP + 0.5·L2 + 0.3·L3 + 0.1·L4 | 0.2133 | 0.5748 | 0.1752 | 0.2273 |
+  | Multi-layer + CLIP Loss gốc | 0.1881 | 0.517 | 0.1293 | 0.2152 |
+  | Multi-layer + 0.5·L2 | **0.2548** | **0.6281** | 0.1723 | 0.2316 |
+  | Multi-layer + 0.5·L2 + 0.3·L3 | 0.2237 | 0.5541 | 0.1808 | **0.2439** |
+  | Multi-layer + 0.5·L2 + 0.3·L3 + 0.1·L4 | 0.2548 | 0.5881 | **0.1952** | 0.240 |
 
-2. Sao chép file môi trường:
-   ```bash
-   cp .env.example .env
-   ```
+- **Embedding Models**: `intfloat/multilingual-e5-base` tối ưu cho tiếng Việt
 
-3. Cập nhật các biến môi trường trong file `.env`
+#### 🗄️ Cơ sở dữ liệu
+- **Qdrant**: Vector database cho tìm kiếm ngữ nghĩa
+- **MySQL**: Lưu trữ thông tin sản phẩm và đơn hàng
 
-4. Khởi chạy với Docker:
-   ```bash
-   ./run_docker.sh
-   ```
+#### 🔄 Framework Multi-Agent
+- **LangGraph**: Xây dựng luồng công việc dạng đồ thị
+- **LangChain**: Kết nối LLM với nguồn dữ liệu
+- **A2A Protocol**: Giao tiếp giữa các agent
 
-### Cài đặt và khởi chạy eyevi_ui
+#### 📚 Kỹ thuật RAG
+- Kết hợp truy xuất thông tin với khả năng sinh văn bản
+- Chunking và xử lý tài liệu tối ưu cho domain mắt kính
 
-1. Di chuyển vào thư mục eyevi_ui:
-   ```bash
-   cd eyevi_ui
-   ```
+### 🎨 Frontend (eyevi_ui)
 
-2. Cài đặt các thư viện phụ thuộc:
-   ```bash
-   npm install
-   ```
+#### 🔧 Framework và Ngôn ngữ
+- **Next.js 15**: Framework React hiện đại
+- **React 19**: Thư viện JavaScript UI
+- **TypeScript**: JavaScript với kiểu tĩnh
 
-3. Khởi chạy ứng dụng:
-   ```bash
-   npm run dev
-   ```
+#### 💅 UI và Styling
+- **Tailwind CSS**: Framework CSS utility-first
+- **shadcn/ui**: Components UI có thể tùy chỉnh
+- **Lucide Icons**: Bộ icon đơn giản
 
-## LIÊN KẾT
+#### 💬 Tính năng
+- Giao diện chat trực quan
+- Đính kèm tệp và hình ảnh
+- Chụp ảnh từ camera
+- Ghi âm giọng nói
 
-- [Mã nguồn trên GitHub](https://github.com/mthangit/Multi-Agents)
-- [Báo cáo khóa luận](https://github.com/mthangit/Multi-Agents/wiki/Report)
+### 🚀 DevOps
+
+- **Docker & Docker Compose**: Container hóa và triển khai
+- **Bash Scripts**: Tự động hóa quy trình
+
+### 🔍 Tối ưu hóa cho Domain Mắt kính
+
+- Từ khóa chuyên ngành: tình trạng thị lực, loại tròng kính, kiểu gọng
+- Tối ưu hóa tìm kiếm: ngưỡng tương đồng 0.68, top-k 8 kết quả
+
 
