@@ -22,8 +22,7 @@ class RecommendationNode:
         self.llm = ChatGoogleGenerativeAI(
             model="gemini-2.0-flash",
             google_api_key=api_key,
-            temperature=0.7,  # Nhiệt độ cao hơn để tạo ra câu trả lời đa dạng
-            streaming=False
+            temperature=0.7
         )
         logger.info("RecommendationNode đã được khởi tạo")
     

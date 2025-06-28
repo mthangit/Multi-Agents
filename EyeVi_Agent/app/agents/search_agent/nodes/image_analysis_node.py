@@ -27,7 +27,6 @@ class ImageAnalysisNode:
             model="gemini-2.0-flash",
             google_api_key=api_key,
             temperature=0.2,  # Nhiệt độ thấp để đảm bảo kết quả ổn định
-            streaming=False   # Tắt streaming để dễ debug
         )
         logger.info("ImageAnalysisNode đã được khởi tạo")
         

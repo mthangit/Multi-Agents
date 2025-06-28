@@ -1,19 +1,20 @@
 # A2A Dependencies
-a2a-sdk>=0.1.0
-starlette>=0.27.0
-click>=8.0.0
+a2a-sdk
+starlette   
+click
 
-langchain>=0.1.0
-langchain-google-genai>=0.0.5
-langgraph>=0.0.20
-fastapi>=0.109.0
-uvicorn>=0.27.0
-qdrant-client>=1.7.0
-pydantic>=2.6.0
-torch>=2.0.0
-transformers>=4.38.0
-pillow>=10.0.0
-python-multipart>=0.0.9
-httpx>=0.26.0
-httpx-sse>=0.4.0 
-python-dotenv==1.1.0
+langchain
+langchain-google-genai
+langgraph
+fastapi
+uvicorn
+qdrant-client
+pydantic
+torch
+transformers
+pillow
+python-multipart
+httpx
+httpx-sse
+python-dotenv
+requests

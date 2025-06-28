@@ -14,6 +14,7 @@ from uuid import uuid4
 import redis.asyncio as aioredis
 from a2a.client import A2AClient, A2ACardResolver
 from a2a.types import SendMessageRequest, SendStreamingMessageRequest, MessageSendParams
+from .redis_optimizations import OptimizedRedisClient, RedisHealthMonitor
 
 logger = logging.getLogger(__name__)
 
@@ -291,7 +292,7 @@ class A2AClientManager:
                 "enabled": True
             },
             "Order Agent": {
-                "url": os.getenv("ORDER_AGENT_URL", "http://localhost:10003"),
+                "url": os.getenv("ORDER_AGENT_URL", "http://localhost:10000"),
                 "enabled": True
             }
         }
@@ -309,11 +310,18 @@ class A2AClientManager:
             )
             # Test connection
             await self.redis_client.ping()
+            
+            # Khởi tạo optimized Redis client và health monitor
+            self.optimized_redis_client = OptimizedRedisClient(self.redis_client)
+            self.redis_health_monitor = RedisHealthMonitor(self.redis_client)
+            
             logger.info("✅ Redis connection khởi tạo thành công")
         except Exception as e:
             logger.error(f"❌ Lỗi khi khởi tạo Redis connection: {e}")
             logger.warning("⚠️ Sẽ sử dụng in-memory storage cho chat history")
             self.redis_client = None
+            self.optimized_redis_client = None
+            self.redis_health_monitor = None
         
         for agent_name, config in self.agents_config.items():
             if config["enabled"]:
@@ -497,13 +505,13 @@ class A2AClientManager:
             del self.chat_histories[session_id]
     
     async def get_user_sessions(self, user_id: str) -> List[str]:
-        """Lấy danh sách tất cả sessions của user từ Redis"""
-        if not user_id or not self.redis_client:
+        """Lấy danh sách tất cả sessions của user từ Redis (sử dụng optimized client)"""
+        if not user_id or not self.optimized_redis_client:
             return []
         
         try:
             pattern = self._get_user_sessions_pattern(user_id)
-            keys = await self.redis_client.keys(pattern)
+            keys = await self.optimized_redis_client.get_all_keys_by_pattern(pattern, max_keys=1000)
             # Extract session_id từ keys
             sessions = []
             for key in keys:
@@ -517,12 +525,42 @@ class A2AClientManager:
             logger.error(f"❌ Lỗi khi lấy user sessions từ Redis: {e}")
             return []
 
+    async def redis_health_check(self) -> dict:
+        """Thực hiện Redis health check chi tiết"""
+        if not self.redis_health_monitor:
+            return {"error": "Redis health monitor not available"}
+        
+        return await self.redis_health_monitor.health_check()
+    
+    async def redis_performance_report(self) -> dict:
+        """Tạo Redis performance report"""
+        if not self.redis_health_monitor:
+            return {"error": "Redis health monitor not available"}
+        
+        return await self.redis_health_monitor.performance_report()
+    
+    async def cleanup_expired_sessions(self, ttl_threshold: int = 86400) -> int:
+        """Cleanup các chat history sessions đã expired"""
+        if not self.optimized_redis_client:
+            return 0
+        
+        pattern = "chat_history:*"
+        return await self.optimized_redis_client.cleanup_expired_sessions(pattern, ttl_threshold)
+
     async def cleanup(self):
         """Cleanup tất cả resources"""
         logger.info("🔄 Cleanup A2A Client Manager...")
         
         for agent_name, agent_client in self.agents.items():
             await agent_client.close()
+        
+        # Cleanup expired sessions trước khi đóng connection
+        if self.optimized_redis_client:
+            try:
+                cleaned_count = await self.cleanup_expired_sessions()
+                logger.info(f"🧹 Đã cleanup {cleaned_count} expired sessions")
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi cleanup expired sessions: {e}")
         
         # Đóng Redis connection
         if self.redis_client:

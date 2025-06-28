@@ -29,7 +29,6 @@ class AttributeExtractionNode:
             model="gemini-2.0-flash",
             google_api_key=api_key,
             temperature=0.1,  # Nhiệt độ thấp để đảm bảo kết quả ổn định
-            streaming=False   # Tắt streaming để dễ debug
         )
         logger.info("AttributeExtractionNode đã được khởi tạo")
     

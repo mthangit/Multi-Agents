@@ -1,0 +1,105 @@
+version: '3.8'
+
+services:
+  # Host Agent Service - Main orchestrator
+  host_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.host
+    container_name: eyevi_host_agent
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - host_agent_logs:/app/logs
+    networks:
+      - eyevi_network
+    depends_on:
+      - order_agent
+      - advisor_agent
+      - search_agent
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Order Agent Service - Product & order management
+  # Internal URL: http://order_agent:10000
+  order_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.order
+    container_name: eyevi_order_agent
+    restart: unless-stopped
+    ports:
+      - "10000:10000"
+    volumes:
+      - order_agent_logs:/app/logs
+    networks:
+      - eyevi_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # Advisor Agent Service - Eye care consultation & RAG
+  # Internal URL: http://advisor_agent:10001
+  advisor_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.advisor
+    container_name: eyevi_advisor_agent
+    restart: unless-stopped
+    ports:
+      - "10001:10001"
+    volumes:
+      - advisor_agent_logs:/app/logs
+      - ./advisor_agent/data:/app/advisor_agent/data:ro
+    networks:
+      - eyevi_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 35s
+
+  # Search Agent Service - Multimodal product search
+  # Internal URL: http://search_agent:10002
+  search_agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.search
+    container_name: eyevi_search_agent
+    restart: unless-stopped
+    ports:
+      - "10002:10002"
+    volumes:
+      - search_agent_logs:/app/logs
+    networks:
+      - eyevi_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 35s
+
+volumes:
+  host_agent_logs:
+    driver: local
+  order_agent_logs:
+    driver: local
+  advisor_agent_logs:
+    driver: local
+  search_agent_logs:
+    driver: local
+
+networks:
+  eyevi_network:
+    driver: bridge
+    name: eyevi_network 

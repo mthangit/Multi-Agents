@@ -16,11 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# Thêm thư mục app vào sys.path để có thể import từ các module khác
-current_dir = os.path.dirname(os.path.abspath(__file__))
-app_dir = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
-if app_dir not in sys.path:
-    sys.path.append(app_dir)
 
 # A2A imports
 from a2a.server.apps import A2AStarletteApplication
@@ -270,61 +265,42 @@ def check_prerequisites():
     # Check API key
     if not os.getenv('GOOGLE_API_KEY'):
         logger.warning('GOOGLE_API_KEY not set, some features may not work')
-    
-    # Check Qdrant connection
-    qdrant_host = os.getenv('QDRANT_HOST', 'localhost')
-    qdrant_port = os.getenv('QDRANT_PORT', '6333')
-    
-    try:
-        import requests
-        response = requests.get(f'http://{qdrant_host}:{qdrant_port}/health', timeout=5)
-        if response.status_code == 200:
-            logger.info(f"✅ Qdrant connected at {qdrant_host}:{qdrant_port}")
-        else:
-            logger.warning(f'Qdrant health check failed at {qdrant_host}:{qdrant_port}')
-    except Exception as e:
-        logger.warning(f'Cannot connect to Qdrant at {qdrant_host}:{qdrant_port}: {e}')
-
+        
 
 def start_server():
     """Khởi động server."""
-    port = int(os.environ.get("SEARCH_AGENT_PORT", "8001"))
+    port = int(os.environ.get("SEARCH_AGENT_PORT", "10002"))
     host = os.environ.get("SEARCH_AGENT_HOST", "0.0.0.0")
     
-    # Sửa đường dẫn module để phù hợp với cấu trúc thư mục
+    logger.info(f"🚀 Starting Search Agent FastAPI server on {host}:{port}")
+    logger.info(f"📋 Health check: http://{host}:{port}/")
+    logger.info(f"🔍 Ready for product search queries!")
+    
+    # Check prerequisites
+    check_prerequisites()
+    
+    # Đường dẫn module đúng khi chạy trong Docker
     uvicorn.run(
-        "app.agents.search_agent.run_server:app",
+        "run_server:app",
         host=host,
         port=port,
-        reload=True
+        reload=False  # Disable reload trong production
     )
 
 if __name__ == "__main__":
-    # Xử lý các tham số dòng lệnh
-    logger.info(f"🚀 Starting Search Agent A2A server on localhost:10002")
-    logger.info(f"📋 Agent Card: http://localhost:10002/.well-known/agent.json")
-    logger.info(f"🔗 A2A Endpoint: http://localhost:10002/")
+    # Get configuration from environment variables
+    port = int(os.environ.get("SEARCH_AGENT_PORT", "10002"))
+    host = os.environ.get("SEARCH_AGENT_HOST", "0.0.0.0")
+    
+    logger.info(f"🚀 Starting Search Agent A2A server on {host}:{port}")
+    logger.info(f"📋 Agent Card: http://{host}:{port}/.well-known/agent.json")
+    logger.info(f"🔗 A2A Endpoint: http://{host}:{port}/")
     logger.info(f"🔍 Ready for product search queries!")
     logger.info(f"🖼️  Supports: Text search, Image search, Multimodal search")
     
-    a2a_server = create_a2a_server("localhost", 10002)
-    uvicorn.run(a2a_server.build(), host="localhost", port=10002)
+    # Check prerequisites
+    check_prerequisites()
     
-    # uvicorn.run(
-    #         "run_server:app",
-    #         host="localhost",
-    #         port=8001,
-    #         reload=False
-    #     )
-
-        # # Lưu thông tin host và port vào môi trường
-        # os.environ["SEARCH_AGENT_HOST"] = "localhost"
-        # os.environ["SEARCH_AGENT_PORT"] = str(10002)
-        
-        # # Khởi động FastAPI server với tham số từ dòng lệnh
-        # uvicorn.run(
-        #     "app.agents.search_agent.run_server:app",
-        #     host="localhost",
-        #     port=10002,
-        #     reload=False
-        # )
+    # Create A2A server with proper host and port
+    a2a_server = create_a2a_server(host, port)
+    uvicorn.run(a2a_server.build(), host=host, port=port)

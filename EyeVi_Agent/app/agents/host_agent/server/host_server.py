@@ -16,6 +16,8 @@ from langchain_core.output_parsers import StrOutputParser
 
 from prompt.root_prompt import ROOT_INSTRUCTION
 from .a2a_client_manager import A2AClientManager
+from .langchain_memory_adapter import EnhancedMemoryManager
+from .mysql_message_history import MySQLMessageHistory
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,12 @@ class HostServer:
         
         # A2A Client Manager để quản lý các agent connections
         self.a2a_client_manager = A2AClientManager()
+        
+        # Enhanced Memory Manager với LangChain
+        self.memory_manager = None
+        
+        # MySQL Message History cho real-time logging
+        self.mysql_history = MySQLMessageHistory()
 
     async def initialize(self):
         """Khởi tạo các components cần thiết"""
@@ -48,6 +56,20 @@ class HostServer:
             
             # Khởi tạo A2A Client Manager
             await self.a2a_client_manager.initialize()
+            
+            # Khởi tạo Enhanced Memory Manager
+            self.memory_manager = EnhancedMemoryManager(
+                redis_client=self.a2a_client_manager.redis_client,
+                llm=self.llm
+            )
+            
+            # Khởi tạo MySQL Message History
+            try:
+                await self.mysql_history.initialize()
+                logger.info("✅ MySQL Message History initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ MySQL Message History failed to initialize: {e}")
+                logger.warning("📝 Messages will only be saved to Redis/LangChain memory")
             
             logger.info("✅ Host Server đã khởi tạo thành công!")
             
@@ -109,15 +131,22 @@ class HostServer:
             # Chuẩn bị thông tin cho orchestrator
             available_agents = await self.a2a_client_manager.get_available_agents()
 
-            # Lấy context từ chat history nếu có session_id
+            # Lấy context từ LangChain memory nếu có session_id
             context_info = ""
-            if session_id:
-                if user_id:
-                    chat_history = await self.a2a_client_manager.get_chat_history(user_id, session_id)
-                else:
-                    chat_history = self.a2a_client_manager.get_chat_history_fallback(session_id)
-                if chat_history:
-                    context_info = f"\nContext từ cuộc hội thoại trước:\n{chat_history.get_context_string()}"
+            if session_id and self.memory_manager:
+                try:
+                    context = await self.memory_manager.get_conversation_context(session_id, user_id, max_messages=5)
+                    if context:
+                        context_info = f"\nContext từ cuộc hội thoại trước:\n{context}"
+                except Exception as e:
+                    logger.warning(f"⚠️ Lỗi khi lấy context từ memory: {e}")
+                    # Fallback to old method
+                    if user_id:
+                        chat_history = await self.a2a_client_manager.get_chat_history(user_id, session_id)
+                    else:
+                        chat_history = self.a2a_client_manager.get_chat_history_fallback(session_id)
+                    if chat_history:
+                        context_info = f"\nContext từ cuộc hội thoại trước:\n{chat_history.get_context_string()}"
             
             # Gọi orchestrator chain để phân tích
             orchestrator_response = await self.orchestrator_chain.ainvoke({
@@ -133,7 +162,7 @@ class HostServer:
             # Xử lý theo decision
             clarified_message = decision.get("clarified_message", message)
             
-            if decision.get("selected_agent") and  ["selected_agent"] != "null":
+            if decision.get("selected_agent") and decision["selected_agent"] != "null":
                 # Gửi message đã được làm rõ tới agent được chọn qua A2A
                 agent_response = await self.a2a_client_manager.send_message_to_agent(
                     agent_name=decision["selected_agent"],
@@ -146,8 +175,17 @@ class HostServer:
                 
                 print(f"Agent response: {agent_response}")
                 
-                # Lưu tin nhắn gốc và clarified message vào chat history
-                chat_history = await self._save_user_message_to_history(message, clarified_message, user_id, session_id)
+                # Lưu tin nhắn vào LangChain memory và MySQL
+                await self._save_messages_to_memory_with_agent(
+                    user_message=message,
+                    ai_response=agent_response_data["text"], 
+                    user_id=user_id, 
+                    session_id=session_id, 
+                    clarified_message=clarified_message,
+                    agent_name=decision["selected_agent"],
+                    response_data=agent_response_data.get("data"),
+                    analysis=decision.get("analysis")
+                )
 
                 return {    
                     "response": agent_response_data["text"],
@@ -158,11 +196,19 @@ class HostServer:
                     "data": agent_response_data["data"] if agent_response_data["has_data"] else None
                 }
             else:
-                # Trả lời trực tiếp và lưu vào chat history
+                # Trả lời trực tiếp và lưu vào memory
                 direct_response = decision.get("direct_response", "Xin lỗi, tôi chưa hiểu yêu cầu của bạn.")
                 
-                # Lưu tin nhắn gốc và clarified message vào chat history
-                chat_history = await self._save_user_message_to_history(message, clarified_message, user_id, session_id)
+                # Lưu tin nhắn vào LangChain memory và MySQL
+                await self._save_messages_to_memory_with_agent(
+                    user_message=message,
+                    ai_response=direct_response, 
+                    user_id=user_id, 
+                    session_id=session_id, 
+                    clarified_message=clarified_message,
+                    agent_name="Host Agent",
+                    analysis=decision.get("analysis")
+                )
                                 
                 return {
                     "response": direct_response,
@@ -195,15 +241,22 @@ class HostServer:
             # Chuẩn bị thông tin cho orchestrator
             available_agents = await self.a2a_client_manager.get_available_agents()
                         
-            # Lấy context từ chat history nếu có session_id
+            # Lấy context từ LangChain memory nếu có session_id
             context_info = ""
-            if session_id:
-                if user_id:
-                    chat_history = await self.a2a_client_manager.get_chat_history(user_id, session_id)
-                else:
-                    chat_history = self.a2a_client_manager.get_chat_history_fallback(session_id)
-                if chat_history:
-                    context_info = f"\nContext từ cuộc hội thoại trước:\n{chat_history.get_context_string()}"
+            if session_id and self.memory_manager:
+                try:
+                    context = await self.memory_manager.get_conversation_context(session_id, user_id, max_messages=5)
+                    if context:
+                        context_info = f"\nContext từ cuộc hội thoại trước:\n{context}"
+                except Exception as e:
+                    logger.warning(f"⚠️ Lỗi khi lấy context từ memory: {e}")
+                    # Fallback to old method
+                    if user_id:
+                        chat_history = await self.a2a_client_manager.get_chat_history(user_id, session_id)
+                    else:
+                        chat_history = self.a2a_client_manager.get_chat_history_fallback(session_id)
+                    if chat_history:
+                        context_info = f"\nContext từ cuộc hội thoại trước:\n{chat_history.get_context_string()}"
             
             # Thêm thông tin về files nếu có
             files_info = ""
@@ -238,33 +291,46 @@ class HostServer:
                     files=files
                 )
                 
-                # Lưu tin nhắn gốc và clarified message vào chat history (với files)
-                chat_history = await self._save_user_message_to_history(message, clarified_message, user_id, session_id, files)
-                if chat_history:
-                    chat_history.add_message("assistant", agent_response, decision["selected_agent"])
-                    # Lưu vào Redis nếu có user_id
-                    if user_id:
-                        await self.a2a_client_manager._save_chat_history_to_redis(user_id, session_id, chat_history)
+                # Parse agent response để lấy data
+                agent_response_data = self.parse_agent_response(agent_response)
+                
+                # Lưu tin nhắn vào LangChain memory và MySQL
+                await self._save_messages_to_memory_with_agent(
+                    user_message=message,
+                    ai_response=agent_response_data["text"], 
+                    user_id=user_id, 
+                    session_id=session_id, 
+                    clarified_message=clarified_message,
+                    agent_name=decision["selected_agent"],
+                    files=files,
+                    response_data=agent_response_data.get("data"),
+                    analysis=decision.get("analysis")
+                )
                 
                 return {
-                    "response": agent_response,
+                    "response": agent_response_data["text"],
                     "agent_used": decision["selected_agent"],
                     "analysis": decision.get("analysis", ""),
                     "clarified_message": clarified_message,
                     "session_id": session_id,
-                    "files_processed": len(files) if files else 0
+                    "files_processed": len(files) if files else 0,
+                    "data": agent_response_data["data"] if agent_response_data["has_data"] else None
                 }
             else:
                 # Trả lời trực tiếp và lưu vào chat history
                 direct_response = decision.get("direct_response", "Xin lỗi, tôi chưa hiểu yêu cầu của bạn.")
                 
-                # Lưu tin nhắn gốc và clarified message vào chat history (với files)
-                chat_history = await self._save_user_message_to_history(message, clarified_message, user_id, session_id, files)
-                if chat_history:
-                    chat_history.add_message("assistant", direct_response, "Host Agent")
-                    # Lưu vào Redis nếu có user_id
-                    if user_id:
-                        await self.a2a_client_manager._save_chat_history_to_redis(user_id, session_id, chat_history)
+                # Lưu tin nhắn vào LangChain memory và MySQL
+                await self._save_messages_to_memory_with_agent(
+                    user_message=message,
+                    ai_response=direct_response, 
+                    user_id=user_id, 
+                    session_id=session_id, 
+                    clarified_message=clarified_message,
+                    agent_name="Host Agent",
+                    files=files,
+                    analysis=decision.get("analysis")
+                )
                 
                 return {
                     "response": direct_response,
@@ -317,8 +383,156 @@ class HostServer:
                 "has_data": False
             }
 
-    async def _save_user_message_to_history(self, original_message: str, clarified_message: str, user_id: Optional[str], session_id: str, files: Optional[List[Any]] = None):
-        """Helper method để lưu tin nhắn gốc và clarified message vào chat history"""
+    async def _save_messages_to_memory(
+        self, 
+        user_message: str, 
+        ai_response: str, 
+        user_id: Optional[str], 
+        session_id: str, 
+        clarified_message: Optional[str] = None,
+        files: Optional[List[Any]] = None
+    ):
+        """Helper method để lưu messages vào LangChain memory và MySQL"""
+        # Convert user_id to int for MySQL (safe conversion)
+        mysql_user_id = None
+        if user_id:
+            try:
+                mysql_user_id = int(user_id)
+            except (ValueError, TypeError):
+                logger.warning(f"⚠️ Invalid user_id format: {user_id}, treating as None")
+        
+        # Save to LangChain Memory (existing logic)
+        if session_id and self.memory_manager:
+            try:
+                # Tạo user message content bao gồm thông tin về files
+                user_message_content = user_message
+                if files:
+                    file_names = [f.name for f in files]
+                    user_message_content += f" [Đính kèm: {', '.join(file_names)}]"
+                
+                # Lưu user message (sử dụng clarified message nếu có)
+                message_to_save = clarified_message if clarified_message else user_message_content
+                await self.memory_manager.add_user_message(session_id, message_to_save, user_id)
+                
+                # Lưu AI response
+                await self.memory_manager.add_ai_message(session_id, ai_response, user_id)
+                
+                logger.debug(f"💾 Đã lưu messages vào LangChain memory cho session {session_id}")
+                
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi lưu messages vào LangChain memory: {e}")
+                # Fallback to old method
+                await self._save_user_message_to_history_fallback(user_message, clarified_message or user_message, user_id, session_id, files)
+        
+        # Save to MySQL (new real-time logging)
+        if self.mysql_history and session_id:
+            try:
+                # Prepare file names for metadata
+                file_names = [f.name for f in files] if files else None
+                
+                # Save user message
+                await self.mysql_history.save_user_message(
+                    session_id=session_id,
+                    message_content=user_message,
+                    user_id=mysql_user_id,
+                    clarified_content=clarified_message,
+                    files=file_names
+                )
+                
+                # Save AI response (determine agent name from context)
+                # Default to Host Agent if no specific agent was used
+                agent_name = "Host Agent"  # Will be updated below if agent was used
+                
+                await self.mysql_history.save_agent_message(
+                    session_id=session_id,
+                    message_content=ai_response,
+                    agent_name=agent_name,
+                    user_id=mysql_user_id
+                )
+                
+                logger.debug(f"💾 Đã lưu messages vào MySQL cho session {session_id}")
+                
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi lưu messages vào MySQL: {e}")
+                # MySQL failure không block user experience
+
+    async def _save_messages_to_memory_with_agent(
+        self, 
+        user_message: str, 
+        ai_response: str, 
+        user_id: Optional[str], 
+        session_id: str, 
+        agent_name: str,
+        clarified_message: Optional[str] = None,
+        files: Optional[List[Any]] = None,
+        response_data: Optional[Dict[str, Any]] = None,
+        analysis: Optional[str] = None
+    ):
+        """Enhanced method để lưu messages với agent information"""
+        # Convert user_id to int for MySQL (safe conversion)
+        mysql_user_id = None
+        if user_id:
+            try:
+                mysql_user_id = int(user_id)
+            except (ValueError, TypeError):
+                logger.warning(f"⚠️ Invalid user_id format: {user_id}, treating as None")
+        
+        # Save to LangChain Memory (existing logic)
+        if session_id and self.memory_manager:
+            try:
+                # Tạo user message content bao gồm thông tin về files
+                user_message_content = user_message
+                if files:
+                    file_names = [f.name for f in files]
+                    user_message_content += f" [Đính kèm: {', '.join(file_names)}]"
+                
+                # Lưu user message (sử dụng clarified message nếu có)
+                message_to_save = clarified_message if clarified_message else user_message_content
+                await self.memory_manager.add_user_message(session_id, message_to_save, user_id)
+                
+                # Lưu AI response
+                await self.memory_manager.add_ai_message(session_id, ai_response, user_id)
+                
+                logger.debug(f"💾 Đã lưu messages vào LangChain memory cho session {session_id}")
+                
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi lưu messages vào LangChain memory: {e}")
+                # Fallback to old method
+                await self._save_user_message_to_history_fallback(user_message, clarified_message or user_message, user_id, session_id, files)
+        
+        # Save to MySQL với agent information
+        if self.mysql_history and session_id:
+            try:
+                # Prepare file names for metadata
+                file_names = [f.name for f in files] if files else None
+                
+                # Save user message
+                await self.mysql_history.save_user_message(
+                    session_id=session_id,
+                    message_content=user_message,
+                    user_id=mysql_user_id,
+                    clarified_content=clarified_message,
+                    files=file_names
+                )
+                
+                # Save AI response với agent information
+                await self.mysql_history.save_agent_message(
+                    session_id=session_id,
+                    message_content=ai_response,
+                    agent_name=agent_name,
+                    user_id=mysql_user_id,
+                    response_data=response_data,
+                    analysis=analysis
+                )
+                
+                logger.debug(f"💾 Đã lưu messages vào MySQL cho session {session_id} (agent: {agent_name})")
+                
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi lưu messages vào MySQL: {e}")
+                # MySQL failure không block user experience
+
+    async def _save_user_message_to_history_fallback(self, original_message: str, clarified_message: str, user_id: Optional[str], session_id: str, files: Optional[List[Any]] = None):
+        """Fallback method để lưu tin nhắn gốc và clarified message vào chat history cũ"""
         if not session_id:
             return
             
@@ -392,7 +606,15 @@ class HostServer:
         return await self.a2a_client_manager.health_check_all()
 
     async def get_chat_history(self, user_id: str, session_id: str):
-        """Lấy chat history cho session (ưu tiên Redis)"""
+        """Lấy chat history cho session (ưu tiên LangChain memory)"""
+        if self.memory_manager:
+            try:
+                memory = await self.memory_manager.get_memory(session_id, user_id)
+                return memory.chat_memory.messages
+            except Exception as e:
+                logger.warning(f"⚠️ Lỗi khi lấy history từ LangChain memory: {e}")
+        
+        # Fallback to old method
         return await self.a2a_client_manager.get_chat_history(user_id, session_id)
     
     def get_chat_history_fallback(self, session_id: str):
@@ -400,7 +622,15 @@ class HostServer:
         return self.a2a_client_manager.get_chat_history_fallback(session_id)
 
     async def clear_chat_history(self, user_id: str, session_id: str):
-        """Xóa chat history cho session"""
+        """Xóa chat history cho session (ưu tiên LangChain memory)"""
+        if self.memory_manager:
+            try:
+                await self.memory_manager.clear_memory(session_id, user_id)
+                logger.info(f"🗑️ Đã xóa LangChain memory cho session {session_id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Lỗi khi xóa LangChain memory: {e}")
+        
+        # Also clear old method for cleanup
         await self.a2a_client_manager.clear_chat_history(user_id, session_id)
     
     def clear_chat_history_fallback(self, session_id: str):
@@ -408,13 +638,27 @@ class HostServer:
         self.a2a_client_manager.clear_chat_history_fallback(session_id)
     
     async def get_user_sessions(self, user_id: str):
-        """Lấy danh sách tất cả sessions của user"""
+        """Lấy danh sách tất cả sessions của user (ưu tiên LangChain memory)"""
+        if self.memory_manager:
+            try:
+                sessions = await self.memory_manager.get_all_user_sessions(user_id)
+                if sessions:
+                    return sessions
+            except Exception as e:
+                logger.warning(f"⚠️ Lỗi khi lấy sessions từ LangChain memory: {e}")
+        
+        # Fallback to old method
         return await self.a2a_client_manager.get_user_sessions(user_id)
 
     async def cleanup(self):
         """Cleanup resources"""
         try:
             await self.a2a_client_manager.cleanup()
+            
+            # Cleanup MySQL connections
+            if self.mysql_history:
+                await self.mysql_history.cleanup()
+            
             logger.info("✅ Host Server cleanup completed")
         except Exception as e:
-            logger.error(f"❌ Error during cleanup: {e}") 
+            logger.error(f"❌ Error during cleanup: {e}")

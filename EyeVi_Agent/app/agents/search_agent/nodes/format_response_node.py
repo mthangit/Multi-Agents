@@ -30,7 +30,6 @@ class FormatResponseNode:
             model="gemini-2.0-flash",
             google_api_key=api_key,
             temperature=0.4,
-            streaming=False
         )
         logger.info("FormatResponseNode đã được khởi tạo")
     
