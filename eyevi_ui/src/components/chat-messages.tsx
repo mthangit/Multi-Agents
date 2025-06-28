@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { User, Bot } from "lucide-react";
+import Image from "next/image";
 
 interface Attachment {
   name: string;
@@ -37,10 +38,13 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
     if (attachment.type.startsWith("image/")) {
       return (
         <a href={attachment.url} target="_blank" rel="noopener noreferrer" className="block">
-          <img 
+          <Image 
             src={attachment.url} 
             alt={attachment.name} 
+            width={200}
+            height={200}
             className="max-w-[200px] max-h-[200px] rounded-md object-contain"
+            style={{ width: 'auto', height: 'auto' }}
           />
         </a>
       );
