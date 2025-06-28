@@ -45,7 +45,7 @@ const ChatContainer = () => {
     
     // Ghi log attachments nếu có (có thể xử lý tải lên file ở đây trong tương lai)
     if (attachments && attachments.length > 0) {
-      console.log('Đính kèm files:', attachments);
+      console.log('Đí nh kèm files:', attachments);
       // Xử lý tải lên file ở đây
     }
     

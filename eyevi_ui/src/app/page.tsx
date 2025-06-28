@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ChatHeader from "@/components/chat-header";
 import ChatMessages from "@/components/chat-messages";
 import ChatInput from "@/components/chat-input";
 import Sidebar from "@/components/sidebar";
+import { useChatApi } from "@/hooks/useChatApi";
 
 interface Message {
   id: string;
@@ -18,6 +19,18 @@ interface Message {
   }[];
 }
 
+interface ChatHistoryMessage {
+  id: string;
+  content: string;
+  role: string;
+  timestamp: string;
+  attachments?: Array<{
+    name: string;
+    url: string;
+    type: string;
+  }>;
+}
+
 export default function Home() {
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -27,6 +40,61 @@ export default function Home() {
       timestamp: new Date(),
     },
   ]);
+  
+  const { 
+    sendMessage, 
+    getChatHistory, 
+    createNewSession, 
+    clearChatHistory,
+    isLoading, 
+    sessionId 
+  } = useChatApi();
+  
+  // Lấy lịch sử chat khi có sessionId
+  useEffect(() => {
+    const fetchChatHistory = async () => {
+      if (sessionId) {
+        const history = await getChatHistory();
+        if (history && history.length > 0) {
+          // Chuyển đổi định dạng tin nhắn từ API sang định dạng UI
+          const formattedMessages = history.map((msg: ChatHistoryMessage) => ({
+            id: msg.id || String(Date.now()),
+            content: msg.content || "",
+            sender: msg.role === "user" ? "user" : "bot",
+            timestamp: new Date(msg.timestamp),
+            attachments: msg.attachments || []
+          }));
+          
+          setMessages(formattedMessages);
+        }
+      }
+    };
+    
+    fetchChatHistory();
+  }, [sessionId, getChatHistory]);
+
+  // Xử lý tạo cuộc trò chuyện mới
+  const handleNewChat = async () => {
+    await createNewSession();
+    setMessages([{
+      id: "1",
+      content: "Xin chào! Tôi là EyeVi, trợ lý ảo của bạn. Tôi có thể giúp gì cho bạn hôm nay?",
+      sender: "bot",
+      timestamp: new Date(),
+    }]);
+  };
+  
+  // Xử lý xóa lịch sử chat
+  const handleClearHistory = async () => {
+    if (await clearChatHistory()) {
+      setMessages([{
+        id: "1",
+        content: "Lịch sử chat đã được xóa. Tôi có thể giúp gì cho bạn?",
+        sender: "bot",
+        timestamp: new Date(),
+      }]);
+    }
+  };
 
   const handleSendMessage = async (content: string, attachments?: File[]) => {
     // Tạo ID duy nhất cho tin nhắn
@@ -46,46 +114,18 @@ export default function Home() {
     };
     
     setMessages(prev => [...prev, userMessage]);
-    console.log("content: ", content)
+    
     try {
-      // Chuẩn bị FormData cho API
-      // const formData = new FormData();
-      // formData.append("message", content);
-      
-      // // Thêm tệp đính kèm vào FormData nếu có
-      // if (attachments && attachments.length > 0) {
-      //   attachments.forEach(file => {
-      //     formData.append("attachments", file);
-      //   });
-      // }
-      
-      // // Gửi yêu cầu đến API chatbot
-      // const response = await fetch("http://localhost:8001/search/text", {
-      //   method: "POST",
-      //   body: formData,
-      // });
-      const response = await fetch("http://localhost:8001/search/text", {
-        method: "POST",
-        body: JSON.stringify({
-          query: content
-        }),
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-      if (!response.ok) {
-        throw new Error("Lỗi khi gửi tin nhắn");
-      }
-      
-      const data = await response.json();
+      // Gửi tin nhắn đến API
+      const response = await sendMessage(content, attachments);
       
       // Thêm phản hồi từ chatbot vào state
       const botMessage: Message = {
         id: Date.now().toString(),
-        content: data.response,
+        content: response.response,
         sender: "bot",
-        timestamp: new Date(),
-        attachments: data.attachments,
+        timestamp: new Date(response.timestamp),
+        // Nếu có data bổ sung, có thể thêm vào đây
       };
       
       setMessages(prev => [...prev, botMessage]);
@@ -106,11 +146,15 @@ export default function Home() {
 
   return (
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar 
+        sessionId={sessionId} 
+        onNewChat={handleNewChat}
+        onClearHistory={handleClearHistory}
+      />
       <div className="flex-1 flex flex-col">
         <ChatHeader />
         <ChatMessages messages={messages} />
-        <ChatInput onSendMessage={handleSendMessage} />
+        <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
       </div>
     </div>
   );
