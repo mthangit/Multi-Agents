@@ -1,0 +1,118 @@
+version: '3.8'
+
+services:
+  # Host Agent - Orchestrator
+  host_agent:
+    build: .
+    container_name: eyevi_host_agent
+    ports:
+      - "8080:8080"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - HOST=0.0.0.0
+      - PORT=8080
+      - ADVISOR_AGENT_URL=http://advisor_agent:10001
+      - SEARCH_AGENT_URL=http://search_agent:10002
+      - ORDER_AGENT_URL=http://order_agent:10003
+    volumes:
+      - ./EyeVi_Agent:/app/EyeVi_Agent
+    command: python /app/EyeVi_Agent/app/agents/host_agent/run_server.py
+    depends_on:
+      - advisor_agent
+      - search_agent
+      - order_agent
+    networks:
+      - eyevi_network
+
+  # Advisor Agent
+  advisor_agent:
+    build: .
+    container_name: eyevi_advisor_agent
+    ports:
+      - "10001:10001"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - GEMINI_MODEL=gemini-1.5-flash
+      - QDRANT_URL=http://qdrant:6333
+    volumes:
+      - ./EyeVi_Agent:/app/EyeVi_Agent
+      - ./data:/app/data
+    command: python /app/EyeVi_Agent/app/agents/advisor_agent/a2a_main.py
+    depends_on:
+      - qdrant
+    networks:
+      - eyevi_network
+
+  # Search Agent
+  search_agent:
+    build: .
+    container_name: eyevi_search_agent
+    ports:
+      - "10002:10002"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - CLIP_MODEL_PATH=/app/EyeVi_Agent/app/models/clip/CLIP_FTMT.pt
+    volumes:
+      - ./EyeVi_Agent:/app/EyeVi_Agent
+    command: python /app/EyeVi_Agent/app/agents/search_agent/run_server.py
+    depends_on:
+      - qdrant
+    networks:
+      - eyevi_network
+
+  # Order Agent
+  order_agent:
+    build: .
+    container_name: eyevi_order_agent
+    ports:
+      - "10003:10003"
+    environment:
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - DB_HOST=mongodb
+      - DB_PORT=27017
+      - DB_USER=root
+      - DB_PASSWORD=example
+      - DB_NAME=eyevi_db
+    volumes:
+      - ./EyeVi_Agent:/app/EyeVi_Agent
+    command: python /app/EyeVi_Agent/app/agents/order_agent/main.py
+    depends_on:
+      - mongodb
+    networks:
+      - eyevi_network
+
+  # Qdrant Vector Database
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: eyevi_qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks:
+      - eyevi_network
+
+  # MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: eyevi_mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=root
+      - MONGO_INITDB_ROOT_PASSWORD=example
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - eyevi_network
+
+volumes:
+  qdrant_data:
+  mongodb_data:
+
+networks:
+  eyevi_network:
+    driver: bridge 

@@ -1,27 +1,26 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { Send, Paperclip, Mic, Camera, Image } from "lucide-react";
+import { Send, Paperclip, Mic, Camera, ImageIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
 interface ChatInputProps {
   onSendMessage: (message: string, attachments?: File[]) => void;
+  isLoading?: boolean;
 }
 
-const ChatInput = ({ onSendMessage }: ChatInputProps) => {
+const ChatInput = ({ onSendMessage, isLoading = false }: ChatInputProps) => {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
-  const [showCamera, setShowCamera] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (message.trim() || attachments.length > 0) {
+    if ((message.trim() || attachments.length > 0) && !isLoading) {
       onSendMessage(message, attachments);
       setMessage("");
       setAttachments([]);
@@ -34,7 +33,7 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !isLoading) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -51,15 +50,21 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
   };
 
   const handleAttachFile = () => {
-    fileInputRef.current?.click();
+    if (!isLoading) {
+      fileInputRef.current?.click();
+    }
   };
 
   const handleUploadImage = () => {
-    imageInputRef.current?.click();
+    if (!isLoading) {
+      imageInputRef.current?.click();
+    }
   };
 
   const handleTakePhoto = () => {
-    cameraInputRef.current?.click();
+    if (!isLoading) {
+      cameraInputRef.current?.click();
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -83,6 +88,7 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
             variant="outline" 
             aria-label="Đính kèm tệp"
             onClick={handleAttachFile}
+            disabled={isLoading}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
@@ -92,9 +98,16 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
             className="hidden" 
             onChange={handleFileChange}
             multiple
+            disabled={isLoading}
           />
           
-          <Button type="button" size="icon" variant="outline" aria-label="Ghi âm">
+          <Button 
+            type="button" 
+            size="icon" 
+            variant="outline" 
+            aria-label="Ghi âm"
+            disabled={isLoading}
+          >
             <Mic className="h-4 w-4" />
           </Button>
           
@@ -104,6 +117,7 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
             variant="outline" 
             aria-label="Chụp ảnh"
             onClick={handleTakePhoto}
+            disabled={isLoading}
           >
             <Camera className="h-4 w-4" />
           </Button>
@@ -114,6 +128,7 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
             onChange={handleFileChange}
             accept="image/*" 
             capture="environment"
+            disabled={isLoading}
           />
           
           <Button 
@@ -122,8 +137,9 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
             variant="outline" 
             aria-label="Tải ảnh lên"
             onClick={handleUploadImage}
+            disabled={isLoading}
           >
-            <Image className="h-4 w-4" />
+            <ImageIcon className="h-4 w-4" />
           </Button>
           <input 
             type="file" 
@@ -132,6 +148,7 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
             onChange={handleFileChange}
             accept="image/*"
             multiple
+            disabled={isLoading}
           />
         </div>
         
@@ -146,6 +163,7 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
                   size="sm" 
                   className="ml-1 h-5 w-5" 
                   onClick={() => removeAttachment(index)}
+                  disabled={isLoading}
                 >
                   ×
                 </Button>
@@ -162,14 +180,19 @@ const ChatInput = ({ onSendMessage }: ChatInputProps) => {
             onKeyDown={handleKeyDown}
             placeholder="Nhập tin nhắn của bạn..."
             className="min-h-[60px] max-h-[200px] resize-none"
+            disabled={isLoading}
           />
           <Button 
             type="submit" 
             size="icon" 
             className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
-            disabled={!message.trim() && attachments.length === 0}
+            disabled={(!message.trim() && attachments.length === 0) || isLoading}
           >
-            <Send className="h-4 w-4" />
+            {isLoading ? (
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </form>
