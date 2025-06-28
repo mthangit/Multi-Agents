@@ -21,8 +21,7 @@ services:
       - advisor_agent
       - search_agent
       - order_agent
-    networks:
-      - eyevi_network
+
 
   # Advisor Agent
   advisor_agent:
@@ -38,10 +37,8 @@ services:
       - ./EyeVi_Agent:/app/EyeVi_Agent
       - ./data:/app/data
     command: python /app/EyeVi_Agent/app/agents/advisor_agent/a2a_main.py
-    depends_on:
-      - qdrant
-    networks:
-      - eyevi_network
+
+
 
   # Search Agent
   search_agent:
@@ -57,10 +54,8 @@ services:
     volumes:
       - ./EyeVi_Agent:/app/EyeVi_Agent
     command: python /app/EyeVi_Agent/app/agents/search_agent/run_server.py
-    depends_on:
-      - qdrant
-    networks:
-      - eyevi_network
+
+
 
   # Order Agent
   order_agent:
@@ -78,41 +73,3 @@ services:
     volumes:
       - ./EyeVi_Agent:/app/EyeVi_Agent
     command: python /app/EyeVi_Agent/app/agents/order_agent/main.py
-    depends_on:
-      - mongodb
-    networks:
-      - eyevi_network
-
-  # Qdrant Vector Database
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: eyevi_qdrant
-    ports:
-      - "6333:6333"
-      - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
-    networks:
-      - eyevi_network
-
-  # MongoDB
-  mongodb:
-    image: mongo:latest
-    container_name: eyevi_mongodb
-    ports:
-      - "27017:27017"
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=root
-      - MONGO_INITDB_ROOT_PASSWORD=example
-    volumes:
-      - mongodb_data:/data/db
-    networks:
-      - eyevi_network
-
-volumes:
-  qdrant_data:
-  mongodb_data:
-
-networks:
-  eyevi_network:
-    driver: bridge 
