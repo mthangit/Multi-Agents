@@ -45,6 +45,15 @@ class SimpleOrderState(TypedDict):
     """State đơn giản cho order agent"""
     messages: Annotated[List[BaseMessage], add_messages]
     current_user_id: int
+    # Thêm các field cho format response
+    products: List[dict]
+    orders: List[dict] 
+    user_info: dict
+    count: int
+    search_type: str
+    operation_type: str
+    llm_response: str
+    formatted_response: dict
 
 # ============ SIMPLIFIED TOOLS ============
 
@@ -418,24 +427,26 @@ class SimplifiedOrderAgent:
         self.graph = self._create_simple_graph()
     
     def _create_simple_graph(self) -> StateGraph:
-        """Tạo workflow LangGraph đơn giản với 2 nodes"""
+        """Tạo workflow LangGraph với 3 nodes: assistant, tools, format_response"""
         workflow = StateGraph(SimpleOrderState)
         
-        # Chỉ 2 nodes: assistant và tools
+        # 3 nodes: assistant, tools, và format_response
         workflow.add_node("assistant", self._assistant_node)
         workflow.add_node("tools", self._tools_node)
+        workflow.add_node("format_response", self._format_response_node)
         
-        # Flow đơn giản
+        # Flow mới: START → assistant → tools → assistant → format_response → END
         workflow.add_edge(START, "assistant")
         workflow.add_conditional_edges(
             "assistant",
             self._should_use_tools,
             {
                 "tools": "tools",
-                "end": END
+                "format": "format_response"
             }
         )
         workflow.add_edge("tools", "assistant")
+        workflow.add_edge("format_response", END)
         
         return workflow.compile()
     
@@ -485,6 +496,12 @@ class SimplifiedOrderAgent:
    BƯỚC 3: Tạo đơn hàng sau khi validate
    BƯỚC 4: Thực hiện confirm lại với user, nếu user cung cấp thông tin mới thì sẽ cập nhật lại thông tin shipping_address/phone
    
+   ⚠️ QUAN TRỌNG KHI XÁC NHẬN VỚI USER:
+   - KHÔNG BAO GIỜ hiển thị product_id, user_id, order_id trong thông tin xác nhận
+   - Thay vào đó sử dụng thông tin dễ hiểu: tên sản phẩm, tên khách hàng, số điện thoại
+   - Ví dụ ĐÚNG: "Bạn muốn đặt 2 chiếc iPhone 15 Pro Max giao đến 123 Nguyễn Trãi?"
+   - Ví dụ SAI: "Bạn muốn đặt 2 sản phẩm ID 5 cho user ID 1?"
+   
    Ví dụ:
    - "đặt 2 sản phẩm ID 1 và 3 sản phẩm ID 5" → [{"product_id": 1, "quantity": 2}, {"product_id": 5, "quantity": 3}]
    - "mua iPhone 2 cái" → Tìm iPhone trước, sau đó tạo đơn
@@ -512,7 +529,15 @@ HƯỚNG DẪN TRẢ LỜI:
 - Khi gọi tool, bạn có thể thêm text bổ sung thân thiện như "Tôi sẽ tìm sản phẩm cho bạn", "Đây là thông tin sản phẩm:", v.v.
 - Sau đó gọi tool để lấy thông tin chi tiết
 - Đảm bảo trả lời đầy đủ thông tin, trả về thêm DATA_MARKER để client xử lý
-- Luôn trả lời bằng tiếng Việt và thân thiện!"""
+- Luôn trả lời bằng tiếng Việt và thân thiện!
+
+🚫 QUY TẮC BẢNG MAT KHAI BÁNG THÔNG TIN VỚI USER:
+- TUYỆT ĐỐI KHÔNG hiển thị các ID (product_id, user_id, order_id) khi giao tiếp với user
+- Chỉ sử dụng ID để gọi tool bên trong, không bao giờ hiển thị trong câu trả lời
+- Luôn dùng thông tin dễ hiểu: tên sản phẩm, tên khách hàng, địa chỉ, số điện thoại
+- Khi xác nhận đơn hàng: "Xác nhận đặt 2 chiếc iPhone 15 Pro Max (500,000 VND/chiếc)"
+- Không nói: "Xác nhận đặt product_id 5 cho user_id 1"
+"""
             
             messages = [AIMessage(content=system_prompt)] + messages
         
@@ -554,52 +579,133 @@ HƯỚNG DẪN TRẢ LỜI:
         
         return {"messages": results}
     
-    def _should_use_tools(self, state: SimpleOrderState) -> Literal["tools", "end"]:
+    def _format_response_node(self, state: SimpleOrderState):
+        """Node format kết quả cuối cùng theo chuẩn"""
+        messages = state["messages"]
+        
+        # Parse thông tin từ messages
+        products = []
+        orders = []
+        user_info = {}
+        count = 0
+        search_type = "general"
+        operation_type = "general"
+        llm_response = ""
+        
+        # Tìm AI response và tool responses
+        for msg in messages:
+            if isinstance(msg, AIMessage) and msg.content:
+                llm_response = msg.content
+            elif isinstance(msg, ToolMessage) and msg.content:
+                # Parse tool response để tách data
+                parsed = parse_agent_response(msg.content)
+                if parsed["has_data"] and parsed["data"]:
+                    data_type = parsed["data"].get("type")
+                    data_content = parsed["data"].get("data")
+                    
+                    if data_type == "product_detail":
+                        products = [data_content]
+                        count = 1
+                        search_type = "product_detail"
+                        operation_type = "find_product"
+                    elif data_type == "product_list":
+                        products = data_content
+                        count = parsed["data"].get("total_count", len(data_content))
+                        search_type = "product_search"
+                        operation_type = "find_product"
+                    elif data_type == "user_info":
+                        user_info = data_content
+                        count = 1
+                        search_type = "user_info"
+                        operation_type = "get_user"
+                    elif data_type == "order_history":
+                        orders = data_content
+                        count = len(data_content)
+                        search_type = "order_history"
+                        operation_type = "get_orders"
+                    elif data_type == "order_created":
+                        orders = [data_content.get("order", {})]
+                        count = 1
+                        search_type = "order_created"
+                        operation_type = "create_order"
+                    elif data_type == "order_updated":
+                        orders = [data_content.get("updated_order", {})]
+                        count = 1
+                        search_type = "order_updated"
+                        operation_type = "update_order"
+        
+        # Tạo formatted response theo chuẩn
+        formatted_response = {
+            "products": products,
+            "orders": orders,
+            "user_info": user_info,
+            "count": count,
+            "llm_response": llm_response,
+            "search_type": search_type,
+            "operation_type": operation_type
+        }
+        
+        return {
+            "products": products,
+            "orders": orders,
+            "user_info": user_info,
+            "count": count,
+            "search_type": search_type,
+            "operation_type": operation_type,
+            "llm_response": llm_response,
+            "formatted_response": formatted_response
+        }
+    
+    def _should_use_tools(self, state: SimpleOrderState) -> Literal["tools", "format"]:
         """Quyết định có dùng tools không"""
         messages = state["messages"]
         last_message = messages[-1]
         
         if hasattr(last_message, 'tool_calls') and last_message.tool_calls:
             return "tools"
-        return "end"
+        return "format"
     
-    def chat(self, message: str, user_id: int = 1) -> str:
-        """Chat với agent"""
+    def chat(self, message: str, user_id: int = 1) -> dict:
+        """Chat với agent - trả về format chuẩn"""
         try:
             initial_state = {
                 "messages": [HumanMessage(content=message)],
-                "current_user_id": user_id
+                "current_user_id": user_id,
+                "products": [],
+                "orders": [],
+                "user_info": {},
+                "count": 0,
+                "search_type": "general",
+                "operation_type": "general",
+                "llm_response": "",
+                "formatted_response": {}
             }
             
             # Chạy workflow
             result = self.graph.invoke(initial_state)
             
-            # Lấy response cuối cùng
-            final_messages = result["messages"]
-            
-            # Tìm AIMessage và ToolMessage
-            ai_content = ""
-            tool_content = ""
-            
-            for msg in final_messages:
-                if isinstance(msg, AIMessage) and msg.content:
-                    ai_content = msg.content
-                elif isinstance(msg, ToolMessage) and msg.content:
-                    tool_content = msg.content
-            
-            # Kết hợp cả hai nếu có
-            if ai_content and tool_content:
-                return f"{ai_content}"
-            elif tool_content:
-                return tool_content
-            elif ai_content:
-                return ai_content
-            
-            return "Xin lỗi, tôi không hiểu câu hỏi của bạn."
+            # Trả về formatted response từ state
+            return result.get("formatted_response", {
+                "products": [],
+                "orders": [],
+                "user_info": {},
+                "count": 0,
+                "llm_response": "Xin lỗi, tôi không hiểu câu hỏi của bạn.",
+                "search_type": "general",
+                "operation_type": "general"
+            })
             
         except Exception as e:
             logger.error(f"Lỗi chat: {e}")
-            return f"❌ Có lỗi xảy ra: {str(e)}"
+            return {
+                "products": [],
+                "orders": [],
+                "user_info": {},
+                "count": 0,
+                "llm_response": f"❌ Có lỗi xảy ra: {str(e)}",
+                "search_type": "error",
+                "operation_type": "error"
+            }
 
 # ============ INSTANCE CREATOR ============
 
@@ -622,4 +728,13 @@ if __name__ == "__main__":
             break
         
         response = agent.chat(user_input)
-        print(f"🤖 Bot: {response}") 
+        print(f"🤖 Bot Response:")
+        print(f"   📝 Text: {response.get('llm_response', 'No response')}")
+        print(f"   📊 Type: {response.get('operation_type', 'unknown')}")
+        print(f"   🔢 Count: {response.get('count', 0)}")
+        if response.get('products'):
+            print(f"   📦 Products: {len(response['products'])} items")
+        if response.get('orders'):
+            print(f"   🛍️ Orders: {len(response['orders'])} items")
+        if response.get('user_info'):
+            print(f"   👤 User Info: Available") 

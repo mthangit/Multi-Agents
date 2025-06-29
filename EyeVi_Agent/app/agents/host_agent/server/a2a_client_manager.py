@@ -16,6 +16,9 @@ from a2a.client import A2AClient, A2ACardResolver
 from a2a.types import SendMessageRequest, SendStreamingMessageRequest, MessageSendParams
 from .redis_optimizations import OptimizedRedisClient, RedisHealthMonitor
 
+from dotenv import load_dotenv
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 class FileInfo:
@@ -214,18 +217,21 @@ class A2AAgentClient:
             response_data = response.model_dump(mode='json', exclude_none=True)
             
             # Extract content từ response
-            content = ""
+            content = {}
             if 'result' in response_data:
-                result = response_data['result']
-                if 'parts' in result:
-                    for part in result['parts']:
-                        if part.get('kind') == 'text':
-                            content += part.get('text', '')
+                result = response_data['result']["artifacts"][0]["parts"]
+                for part in result:
+                    if part.get('kind') == 'text':
+                        content["text"] = part.get('text', '')
+                    elif part.get('kind') == 'data':
+                        content["data"] = part.get('data', {}).get("products", [])
+                        content["orders"] = part.get('data', {}).get("orders", [])
+                        content["user_info"] = part.get('data', {}).get("user_info", {})
             
             if not content:
-                content = "Không có response từ agent"
+                content["text"] = "Không có response từ agent"
             
-            logger.info(f"📥 Nhận response từ {self.agent_name}: {content[:100]}...")
+            logger.info(f"📥 Nhận response từ {self.agent_name}: {content['text'][:100]}...")
             return content
             
         except Exception as e:
@@ -353,17 +359,9 @@ class A2AClientManager:
         agent_client = self.agents[agent_name]
         
         # Lấy context từ chat history (sử dụng Redis nếu có user_id)
-        context = None
-        if session_id:
-            if user_id and self.redis_client:
-                chat_history = await self._load_chat_history_from_redis(user_id, session_id)
-                if chat_history:
-                    context = chat_history.get_context_string()
-            elif session_id in self.chat_histories:
-                context = self.chat_histories[session_id].get_context_string()
         
         # Gửi message với files và user_id
-        response = await agent_client.send_message(message, context, files, user_id)
+        response = await agent_client.send_message(message, None, files, user_id)
         
         # Lưu vào chat history
         if session_id:
@@ -376,12 +374,12 @@ class A2AClientManager:
             if user_id and self.redis_client:
                 # Sử dụng Redis
                 chat_history = await self._ensure_chat_history_with_redis(user_id, session_id)
-                chat_history.add_message("assistant", response, agent_name)
+                chat_history.add_message("assistant", response.get("text", ""), agent_name)
                 await self._save_chat_history_to_redis(user_id, session_id, chat_history)
             else:
                 # Fallback to in-memory
                 self._ensure_chat_history(session_id)
-                self.chat_histories[session_id].add_message("assistant", response, agent_name)
+                self.chat_histories[session_id].add_message("assistant", response.get("text", ""), agent_name)
         
         return response
 

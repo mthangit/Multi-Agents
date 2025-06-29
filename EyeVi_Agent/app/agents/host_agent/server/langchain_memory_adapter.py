@@ -185,19 +185,30 @@ class EnhancedMemoryManager:
         max_messages: int = 10
     ) -> str:
         """Lấy context từ conversation history"""
-        memory = await self.get_memory(session_id, user_id)
-        
-        # Lấy messages gần đây
-        messages = memory.chat_memory.messages[-max_messages:] if memory.chat_memory.messages else []
-        
-        context_parts = []
-        for msg in messages:
-            if isinstance(msg, HumanMessage):
-                context_parts.append(f"User: {msg.content}")
-            elif isinstance(msg, AIMessage):
-                context_parts.append(f"Assistant: {msg.content}")
-        
-        return "\n".join(context_parts)
+        try:
+            memory = await self.get_memory(session_id, user_id)
+            
+            # Lấy messages gần đây
+            messages = memory.chat_memory.messages[-max_messages:] if memory.chat_memory.messages else []
+            
+            context_parts = []
+            for msg in messages:
+                if isinstance(msg, HumanMessage):
+                    context_parts.append(f"User: {msg.content}")
+                elif isinstance(msg, AIMessage):
+                    # Kiểm tra xem có agent information không
+                    agent_info = ""
+                    if hasattr(msg, 'additional_kwargs') and msg.additional_kwargs:
+                        agent_used = msg.additional_kwargs.get('agent_used')
+                        if agent_used:
+                            agent_info = f" ({agent_used})"
+                    context_parts.append(f"Assistant{agent_info}: {msg.content}")
+            
+            return "\n".join(context_parts)
+            
+        except Exception as e:
+            logger.error(f"❌ Lỗi khi lấy conversation context: {e}")
+            return ""
     
     async def get_memory_variables(self, session_id: str, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Lấy memory variables cho LLM chain"""

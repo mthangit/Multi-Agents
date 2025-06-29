@@ -13,6 +13,7 @@ from a2a.types import (
     TaskState,
     TextPart,
     UnsupportedOperationError,
+    DataPart,
 )
 from a2a.utils.errors import ServerError
 from a2a.utils import new_agent_text_message, new_task
@@ -72,16 +73,21 @@ class OrderAgentExecutor(AgentExecutor):
             async def execute_simplified_task():
                 logger.info("💬 Gọi simplified order agent...")
                 response = self.agent.chat(query, user_id=1)
-                parts = [Part(root=TextPart(text=response))]
+                
+                text_part = TextPart(text=response.get("llm_response", ""))
+                data_part = DataPart(data=response)
+                parts = [Part(root=text_part), Part(root=data_part)]
                 
                 await updater.add_artifact(parts, name="order_result")
                 
                 # Send formatted text response to the user
-                await event_queue.enqueue_event(new_agent_text_message(
-                    text=response,
-                    context_id=context.context_id,
-                    task_id=context.task_id,
-                ))
+                # await event_queue.enqueue_event(new_agent_text_message(
+                #     text=response,
+                #     context_id=context.context_id,
+                #     task_id=context.task_id,
+                # ))
+                
+                await event_queue.enqueue_event(task)
                 
                 await updater.complete()
                 logger.info("✅ Hoàn thành task với simplified agent")

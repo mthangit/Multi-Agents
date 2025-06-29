@@ -22,6 +22,7 @@ from a2a.types import (
 from a2a.utils import (
     new_agent_text_message,
     new_task,
+    new_data_artifact
 )
 from a2a.utils.errors import ServerError
 
@@ -68,18 +69,24 @@ class SearchAgentExecutor(AgentExecutor):
             # Format the response as text
             formatted_result = self._format_search_result(result)
             
+            data_part = DataPart(data=result)
+            text_part = TextPart(text=formatted_result)
             # Create parts for the task artifact (full result)
-            parts = [Part(root=TextPart(text=json.dumps(result, ensure_ascii=False, indent=2)))]
+            parts = [Part(root=data_part), Part(root=text_part)]
 
             # Update task status and complete
             await updater.add_artifact(parts, name="search_result")
             
             # Send formatted text response to the user
-            await event_queue.enqueue_event(new_agent_text_message(
-                text=formatted_result,
-                context_id=context.context_id,
-                task_id=context.task_id,
-            ))
+            # await event_queue.enqueue_event(new_agent_text_message(
+            #     text=formatted_result,
+            #     context_id=context.context_id,
+            #     task_id=context.task_id,
+            # ))
+            
+            await event_queue.enqueue_event(
+                task
+            )
             
             await updater.complete()
 
