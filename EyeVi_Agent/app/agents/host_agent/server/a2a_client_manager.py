@@ -290,15 +290,15 @@ class A2AClientManager:
         # Cấu hình các agents từ environment variables
         self.agents_config = {
             "Advisor Agent": {
-                "url": os.getenv("ADVISOR_AGENT_URL", "http://localhost:10001"),
+                "url": os.getenv("ADVISOR_AGENT_URL", "http://advisor_agent:10001"),
                 "enabled": True
             },
             "Search Agent": {
-                "url": os.getenv("SEARCH_AGENT_URL", "http://localhost:10002"),
+                "url": os.getenv("SEARCH_AGENT_URL", "http://search_agent:10002"),
                 "enabled": True
             },
             "Order Agent": {
-                "url": os.getenv("ORDER_AGENT_URL", "http://localhost:10000"),
+                "url": os.getenv("ORDER_AGENT_URL", "http://order_agent:10000"),
                 "enabled": True
             }
         }
