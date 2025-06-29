@@ -1,4 +1,4 @@
-from typing import List, Dict, Optional, Any, TypedDict, AsyncGenerator
+from typing import List, Dict, Optional, Any, TypedDict
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain.schema import HumanMessage, SystemMessage, AIMessage
 from langgraph.graph import StateGraph, END
@@ -6,9 +6,10 @@ from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
 from config import Config, EYEWEAR_KEYWORDS
 import re
-import asyncio
 import json
 from datetime import datetime
+from utils.embedding_manager import EmbeddingManager
+from utils.qdrant_manager import QdrantManager
 
 # Định nghĩa State cho LangGraph
 class RAGState(TypedDict):
@@ -61,10 +62,19 @@ class RAGAgent:
         
         print("✅ RAG Agent với LangGraph đã sẵn sàng!")
     
-    def set_managers(self, embedding_manager, qdrant_manager):
-        """Inject các managers cần thiết"""
+    def set_managers(self, embedding_manager: EmbeddingManager, qdrant_manager: QdrantManager):
+        """Inject các managers cần thiết với validation"""
+        if embedding_manager is None:
+            raise ValueError("Embedding manager không được để trống")
+        if qdrant_manager is None:
+            raise ValueError("Qdrant manager không được để trống")
+            
         self.embedding_manager = embedding_manager
         self.qdrant_manager = qdrant_manager
+        
+        print("✅ Đã inject managers vào RAG Agent thành công")
+        print(f"   - Embedding model: {getattr(embedding_manager, 'model', 'unknown')}")
+        print(f"   - Qdrant collection: {getattr(qdrant_manager, 'collection_name', 'unknown')}")
     
     def _create_workflow(self) -> StateGraph:
         """Tạo LangGraph workflow cho RAG process"""
@@ -122,12 +132,12 @@ class RAGAgent:
             
             # Tạo embedding cho query
             query_embedding = self.embedding_manager.embed_query(state["query"])
-            state["query_embedding"] = query_embedding
+            state["query_embedding"] = query_embedding.tolist()  # Convert numpy array to list
             
-            # Tìm kiếm documents
-            retrieved_docs = self.qdrant_manager.search_documents(
-                query_embedding, 
-                limit=Config.MAX_RETRIEVAL_DOCS
+            # Tìm kiếm documents - Sửa method name và convert data type
+            retrieved_docs = self.qdrant_manager.search_similar_documents(
+                query_embedding.tolist(),  # Convert numpy array to list for Qdrant
+                limit=Config.TOP_K_DOCUMENTS
             )
             state["retrieved_documents"] = retrieved_docs
             state["status"] = "documents_retrieved"
@@ -232,62 +242,6 @@ class RAGAgent:
         
         return state
     
-    async def stream(self, query: str, user_context: Dict = None) -> AsyncGenerator[Dict[str, Any], None]:
-        """
-        Stream processing với LangGraph
-        Yields từng bước xử lý của workflow
-        """
-        start_time = datetime.now()
-        
-        # Khởi tạo state
-        initial_state: RAGState = {
-            "query": query,
-            "user_context": user_context or {},
-            "intent_info": {},
-            "query_embedding": None,
-            "retrieved_documents": [],
-            "relevant_documents": [],
-            "context": "",
-            "answer": "",
-            "sources": [],
-            "confidence_score": 0.0,
-            "messages": [],
-            "step": "Bắt đầu",
-            "processing_time": 0.0,
-            "status": "started",
-            "error": None
-        }
-        
-        try:
-            # Stream từng bước của workflow
-            async for step_output in self.compiled_workflow.astream(initial_state):
-                # Tính thời gian xử lý
-                processing_time = (datetime.now() - start_time).total_seconds()
-                
-                # Cập nhật processing time
-                for node_name, node_state in step_output.items():
-                    if isinstance(node_state, dict):
-                        node_state["processing_time"] = processing_time
-                
-                # Yield update cho client
-                yield {
-                    "step": step_output,
-                    "timestamp": datetime.now().isoformat(),
-                    "processing_time": processing_time
-                }
-                
-                # Kiểm tra lỗi
-                for node_name, node_state in step_output.items():
-                    if isinstance(node_state, dict) and node_state.get("status") == "error":
-                        break
-            
-        except Exception as e:
-            yield {
-                "error": f"Lỗi workflow: {str(e)}",
-                "timestamp": datetime.now().isoformat(),
-                "processing_time": (datetime.now() - start_time).total_seconds()
-            }
-    
     def invoke(self, query: str, user_context: Dict = None) -> Dict[str, Any]:
         """
         Invoke synchronous processing
@@ -386,6 +340,7 @@ class RAGAgent:
         base_role = """Bạn là chuyên gia tư vấn mắt kính chuyên nghiệp với nhiều năm kinh nghiệm trong lĩnh vực quang học. 
 Bạn có kiến thức sâu rộng về:
 - Các tật khúc xạ mắt (cận thị, viễn thị, loạn thị, lão thị)
+- Các kiến thức sức khoẻ về mắt
 - Các loại tròng kính và công nghệ lens
 - Phong cách và thiết kế gọng kính
 - Vật liệu và công nghệ sản xuất
@@ -398,14 +353,6 @@ Hãy tập trung vào:
 - Đề xuất loại tròng kính phù hợp
 - Lưu ý về việc thăm khám mắt định kỳ
 - Không thay thế ý kiến bác sĩ chuyên khoa"""
-
-        elif intent_info["query_type"] == "product_recommendation":
-            role_specific = """
-Hãy tập trung vào:
-- So sánh ưu nhược điểm các sản phẩm
-- Đề xuất sản phẩm phù hợp với nhu cầu
-- Thông tin về giá cả và chất lượng
-- Hướng dẫn cách chọn mua"""
 
         elif intent_info["query_type"] == "style_consultation":
             role_specific = """
@@ -541,7 +488,8 @@ Lưu ý:
             content = f"{source_info}\n{doc['content']}\n"
             context_parts.append(content)
         
-        context = "\n" + "="*50 + "\n".join(context_parts)
+        # Sửa formatting để context rõ ràng hơn
+        context = "\n" + ("="*50 + "\n").join(context_parts)
         
         print(f"Đã tổng hợp context từ {len(documents)} documents")
         return context
@@ -629,7 +577,6 @@ Hãy trả lời câu hỏi dựa trên ngữ cảnh trên. Định dạng trả
                     "intent_detection": True,
                     "domain_prompts": True,
                     "medical_disclaimer": True,
-                    "streaming_support": True,
                     "langgraph_workflow": True,
                     "product_recommendations": getattr(Config, 'ENABLE_PRODUCT_RECOMMENDATIONS', True),
                     "technical_advice": getattr(Config, 'ENABLE_TECHNICAL_ADVICE', True)

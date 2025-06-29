@@ -34,15 +34,53 @@ cp env.example .env
 nano .env
 ```
 
-Các biến cần thiết:
-- `GOOGLE_API_KEY`: API key của Google Gemini (bắt buộc)
+**Các biến bắt buộc:**
+- `GOOGLE_API_KEY`: API key của Google Gemini
+
+**Các biến tùy chọn:**
 - `HOST`: Host server (mặc định: 0.0.0.0)
 - `PORT`: Port server (mặc định: 8080)
 - `ADVISOR_AGENT_URL`: URL của Advisor Agent A2A server (mặc định: http://localhost:10001)
 - `SEARCH_AGENT_URL`: URL của Search Agent A2A server (mặc định: http://localhost:10002)
 - `ORDER_AGENT_URL`: URL của Order Agent A2A server (mặc định: http://localhost:10003)
 
-### 3. Chạy server
+**MySQL Configuration (tùy chọn - cho real-time logging):**
+- `MYSQL_HOST`: MySQL host (mặc định: localhost)
+- `MYSQL_PORT`: MySQL port (mặc định: 3306)
+- `MYSQL_USER`: MySQL username (mặc định: root)
+- `MYSQL_PASSWORD`: MySQL password
+- `MYSQL_DATABASE`: Database name (mặc định: chat_db)
+
+**Redis Configuration (tùy chọn):**
+- `REDIS_HOST`: Redis host (mặc định: localhost)
+- `REDIS_PORT`: Redis port (mặc định: 6379)
+- `REDIS_PASSWORD`: Redis password
+- `REDIS_DB`: Redis database number (mặc định: 0)
+
+### 3. Setup MySQL Database (Tùy chọn)
+
+**Để bật real-time message logging:**
+
+```bash
+# 1. Tạo database và table
+mysql -u root -p < setup_mysql.sql
+
+# 2. Configure environment variables trong .env
+MYSQL_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_USER=root
+MYSQL_PASSWORD=your_password
+MYSQL_DATABASE=chat_db
+```
+
+**MySQL sẽ tự động lưu:**
+- Tất cả messages từ user và AI responses
+- Rich metadata: files, agent info, analysis data
+- Session tracking và user history
+
+**Nếu không có MySQL:** System vẫn hoạt động bình thường với Redis + LangChain memory.
+
+### 4. Chạy server
 
 ```bash
 # Cách 1: Chạy trực tiếp
@@ -185,6 +223,18 @@ Example log:
    Solution: Kiểm tra prompt template và model response
    ```
 
+## 📚 Documentation
+
+**📋 [Complete API Documentation](API_DOCUMENTATION.md)** - Comprehensive guide với tất cả endpoints, examples, và usage instructions
+
+### **🚀 Key Features**
+- ✅ **MySQL Real-time Logging**: Mỗi message tự động save vào MySQL với rich metadata
+- ✅ **LangChain Memory Integration**: Advanced conversation memory management  
+- ✅ **Triple Storage Strategy**: Redis + LangChain + MySQL cho optimal performance
+- ✅ **Multi-modal Support**: Text + file upload processing
+- ✅ **Agent Orchestration**: Intelligent routing tới specialized agents
+- ✅ **Enhanced Error Handling**: Graceful fallback mechanisms
+
 ## 🔄 Development
 
 Khi phát triển thêm tính năng:
@@ -192,15 +242,28 @@ Khi phát triển thêm tính năng:
 1. **Thêm agent mới**: Cập nhật `agents_config` trong `HostServer`
 2. **Thay đổi logic điều phối**: Chỉnh sửa prompt template
 3. **Thêm endpoint**: Cập nhật `main.py`
+4. **Database changes**: Update MySQL schema trong `setup_mysql.sql`
 
 ## 📚 Dependencies
 
-- **FastAPI**: Web framework
-- **LangChain**: LLM integration và prompt management
+### **Core Dependencies**
+- **FastAPI**: Web framework cho REST API
+- **LangChain**: LLM integration và conversation memory management
 - **Google Gemini**: LLM cho việc phân tích và điều phối
 - **A2A SDK**: Agent-to-Agent communication protocol
 - **httpx**: HTTP client cho A2A communication
 - **uvicorn**: ASGI server
+
+### **Storage & Database**
+- **Redis**: Session management và caching
+- **SQLAlchemy**: Database ORM với async support
+- **aiomysql**: Async MySQL connector
+- **pymysql**: MySQL driver
+
+### **Development & Testing**
+- **python-multipart**: File upload support
+- **python-dotenv**: Environment configuration
+- **Postman**: API testing với provided collection
 
 ## 🤝 Contributing
 

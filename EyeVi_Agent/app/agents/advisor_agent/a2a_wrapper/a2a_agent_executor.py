@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class AdvisorAgentExecutor(AgentExecutor):
     """
-    A2A Agent Executor cho Eyewear Advisor Agent với LangGraph streaming support
+    A2A Agent Executor cho Eyewear Advisor Agent với LangGraph workflow
     Implements proper A2A AgentExecutor interface
     """
     
@@ -46,7 +46,7 @@ class AdvisorAgentExecutor(AgentExecutor):
     async def execute(self, context: RequestContext, event_queue: EventQueue) -> None:
         """
         Execute method theo A2A AgentExecutor interface
-        Sử dụng EventQueue để emit streaming events
+        Sử dụng LangGraph workflow với invoke
         """
         if not context.task_id or not context.context_id:
             raise ValueError("RequestContext must have task_id and context_id")
@@ -65,70 +65,43 @@ class AdvisorAgentExecutor(AgentExecutor):
             query = context.get_user_input()
             print(f"🔄 Processing query: {query}")
             
-            # Process với LangGraph workflow
-            final_answer = None
-            sources = []
-            metadata = {}
+            # Process với LangGraph invoke (không streaming)
+            start_time = datetime.now()
+            result = self.rag_agent.invoke(query)
+            processing_time = (datetime.now() - start_time).total_seconds()
             
-            async for step_data in self.rag_agent.stream(query):
-                if "error" in step_data:
-                    error_message = f"Lỗi workflow: {step_data['error']}"
-                    logger.error(error_message)
-                    raise ServerError(error=InternalError()) from Exception(step_data["error"])
-                
-                # Parse step information
-                step_info = step_data.get("step", {})
-                processing_time = step_data.get("processing_time", 0)
-                
-                for node_name, node_state in step_info.items():
-                    if isinstance(node_state, dict):
-                        step_name = node_state.get("step", "Processing")
-                        status = node_state.get("status", "running")
-                        
-                        # Log progress
-                        logger.info(f"[{node_name}] {step_name} - {status} ({processing_time:.2f}s)")
-                        
-                        # Check for final answer
-                        if status == "completed" and node_state.get("answer"):
-                            final_answer = node_state["answer"]
-                            sources = node_state.get("sources", [])
-                            metadata = {
-                                "intent_info": node_state.get("intent_info", {}),
-                                "confidence_score": node_state.get("confidence_score", 0.0),
-                                "relevant_documents_count": len(node_state.get("relevant_documents", [])),
-                                "processing_time": processing_time,
-                                "sources": sources
-                            }
-                            break
-                
-                # Break if we have final answer
-                if final_answer:
-                    break
+            # Log processing info
+            logger.info(f"✅ Processed query in {processing_time:.2f}s")
+            logger.info(f"Intent: {result.get('intent_info', {}).get('query_type', 'unknown')}")
+            logger.info(f"Retrieved {result.get('total_retrieved_count', 0)} documents")
+            logger.info(f"Used {result.get('relevant_documents_count', 0)} relevant documents")
             
-            # Ensure we have an answer
-            if not final_answer:
-                final_answer = "Xin lỗi, tôi không thể tạo câu trả lời cho câu hỏi này."
-                logger.warning("No final answer received from LangGraph workflow")
+            final_answer = result.get("answer", "Xin lỗi, tôi không thể tạo câu trả lời cho câu hỏi này.")
+            sources = result.get("sources", [])
+            
+            # Prepare metadata
+            metadata = {
+                "intent_info": result.get("intent_info", {}),
+                "confidence_score": result.get("confidence_score", 0.0),
+                "relevant_documents_count": result.get("relevant_documents_count", 0),
+                "total_retrieved_count": result.get("total_retrieved_count", 0),
+                "processing_time": processing_time,
+                "sources": sources,
+                "status": result.get("status", "completed")
+            }
             
             # Convert response to A2A parts
             parts = [Part(root=TextPart(text=final_answer))]
             
-            # Add artifact with metadata if we have sources
-            if sources:
-                await updater.add_artifact(
-                    parts, 
-                    name="consultation_result",
-                    metadata=metadata
-                )
-            else:
-                await updater.add_artifact(parts, name="consultation_result")
+            # Add artifact with metadata
+            await updater.add_artifact(
+                parts, 
+                name="consultation_result",
+                metadata=metadata
+            )
             
             # Complete the task
-            await event_queue.enqueue_event(new_agent_text_message(
-                text=final_answer,
-                context_id=context.context_id,
-                task_id=context.task_id,
-            ))
+            await event_queue.enqueue_event(task)
             
             await updater.complete()
             
@@ -150,12 +123,12 @@ class AdvisorAgentExecutor(AgentExecutor):
     
     async def execute_sync(self, user_message: str, context: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Execute synchronous (non-streaming) cho testing/debugging
+        Execute synchronous cho testing/debugging
         """
         try:
             start_time = datetime.now()
             
-            # Sử dụng invoke thay vì stream
+            # Sử dụng invoke với LangGraph workflow
             result = self.rag_agent.invoke(user_message, context)
             
             total_time = (datetime.now() - start_time).total_seconds()
@@ -226,11 +199,11 @@ class AdvisorAgentExecutor(AgentExecutor):
                     }
                 },
                 "capabilities": {
-                    "streaming": True,
                     "intent_detection": True,
                     "domain_specific": True,
                     "multi_language": True,
-                    "document_retrieval": True
+                    "document_retrieval": True,
+                    "workflow_execution": True
                 },
                 "timestamp": datetime.now().isoformat()
             }

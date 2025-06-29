@@ -41,9 +41,12 @@ class ChatResponse(BaseModel):
     session_id: Optional[str] = None
     clarified_message: Optional[str] = None
     analysis: Optional[str] = None
-    data: Optional[str] = None
+    data: Optional[list] = None
+    user_info: Optional[dict] = None
+    orders: Optional[list] = None
     status: str = "success"
     timestamp: str
+    extracted_product_ids: Optional[List[str]] = None
 
 class HealthResponse(BaseModel):
     status: str
@@ -158,8 +161,11 @@ async def chat(
             clarified_message=result.get("clarified_message"),
             analysis=result.get("analysis"),
             data=result.get("data"),
+            user_info=result.get("user_info"),
+            orders=result.get("orders"),
             status="success",
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
+            extracted_product_ids=result.get("extracted_product_ids")
         )
         
     except Exception as e:
@@ -192,27 +198,30 @@ async def get_chat_history(session_id: str, user_id: Optional[str] = None):
     """Lấy lịch sử chat cho session"""
     try:
         if user_id:
-            chat_history = await host_server.get_chat_history(user_id, session_id)
+            messages = await host_server.get_chat_history(user_id, session_id)
         else:
-            chat_history = host_server.get_chat_history_fallback(session_id)
+            messages = host_server.get_chat_history_fallback(session_id)
         
-        if not chat_history:
+        if not messages:
             return {
                 "status": "success",
                 "session_id": session_id,
                 "user_id": user_id,
                 "messages": [],
-                "message": "Không có lịch sử chat cho session này"
+                "message": "Không có lịch sử chat cho session này",
+                "total_messages": 0
             }
+        
+        # Lấy 50 tin nhắn gần đây nhất
+        recent_messages = messages[-50:] if len(messages) > 50 else messages
         
         return {
             "status": "success",
             "session_id": session_id,
             "user_id": user_id,
-            "messages": chat_history.get_recent_messages(50),
-            "created_at": chat_history.created_at.isoformat(),
-            "last_updated": chat_history.last_updated.isoformat(),
-            "total_messages": len(chat_history.messages)
+            "messages": recent_messages,
+            "total_messages": len(messages),
+            "returned_messages": len(recent_messages)
         }
         
     except Exception as e:
