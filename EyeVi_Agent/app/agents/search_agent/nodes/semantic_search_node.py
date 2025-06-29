@@ -30,7 +30,6 @@ class SemanticSearchNode:
         """
         try:
             self.qdrant_client = QdrantClient("http://eyevi.devsecopstech.click", port=qdrant_port)
-            logger.info(f"Đã kết nối đến Qdrant tại {"http://eyevi.devsecopstech.click"}:{qdrant_port}")
         except Exception as e:
             logger.error(f"Lỗi khi kết nối đến Qdrant: {e}")
             raise

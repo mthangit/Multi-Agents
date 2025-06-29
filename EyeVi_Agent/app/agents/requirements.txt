@@ -1,0 +1,62 @@
+# Requirements tổng hợp cho tất cả các agent trong EyeVi_Agent
+
+# Core A2A SDK và giao tiếp
+a2a-sdk>=0.1.0
+starlette>=0.27.0
+click>=8.0.0
+httpx>=0.26.0
+httpx-sse>=0.4.0
+protobuf
+
+# FastAPI và web framework
+fastapi>=0.109.0
+uvicorn>=0.27.0
+pydantic>=2.6.0
+pydantic-settings
+python-multipart>=0.0.9
+
+# LangChain ecosystem
+langchain>=0.1.0
+langchain-core
+langchain-community
+langchain-openai
+langchain-google-genai>=0.0.5
+langgraph>=0.0.20
+
+# Google AI SDK
+google-genai
+
+# Database connections
+redis[hiredis]>=4.5.0
+qdrant-client>=1.7.0
+mysql-connector-python
+pymongo
+aiomysql
+sqlalchemy[asyncio]
+pymysql
+
+# Machine Learning và AI
+torch>=2.0.0
+transformers>=4.38.0
+sentence-transformers
+numpy
+tiktoken
+scikit-learn
+rank-bm25
+
+# Document processing
+PyPDF2
+pillow>=10.0.0
+
+# Vietnamese text processing
+regex
+unicodedata2
+
+# Utilities
+python-dotenv==1.1.0
+asyncio
+nest-asyncio
+structlog
+
+# Development và monitoring
+# (thêm các package development nếu cần) 

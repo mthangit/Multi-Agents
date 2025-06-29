@@ -17,6 +17,7 @@ langchain
 langchain-openai
 langchain-google-genai
 langchain-core
+langchain-community
 
 # Google AI SDK dependencies  
 google-genai
@@ -26,3 +27,7 @@ a2a-sdk
 
 python-multipart
 
+# MySQL dependencies
+aiomysql
+sqlalchemy[asyncio]
+pymysql

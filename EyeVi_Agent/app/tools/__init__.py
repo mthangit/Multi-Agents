@@ -1,3 +1,0 @@
-"""
-Tools cho Google ADK
-"""

@@ -14,6 +14,10 @@ from uuid import uuid4
 import redis.asyncio as aioredis
 from a2a.client import A2AClient, A2ACardResolver
 from a2a.types import SendMessageRequest, SendStreamingMessageRequest, MessageSendParams
+from .redis_optimizations import OptimizedRedisClient, RedisHealthMonitor
+
+from dotenv import load_dotenv
+load_dotenv()
 
 logger = logging.getLogger(__name__)
 
@@ -213,18 +217,21 @@ class A2AAgentClient:
             response_data = response.model_dump(mode='json', exclude_none=True)
             
             # Extract content từ response
-            content = ""
+            content = {}
             if 'result' in response_data:
-                result = response_data['result']
-                if 'parts' in result:
-                    for part in result['parts']:
-                        if part.get('kind') == 'text':
-                            content += part.get('text', '')
+                result = response_data['result']["artifacts"][0]["parts"]
+                for part in result:
+                    if part.get('kind') == 'text':
+                        content["text"] = part.get('text', '')
+                    elif part.get('kind') == 'data':
+                        content["data"] = part.get('data', {}).get("products", [])
+                        content["orders"] = part.get('data', {}).get("orders", [])
+                        content["user_info"] = part.get('data', {}).get("user_info", {})
             
             if not content:
-                content = "Không có response từ agent"
+                content["text"] = "Không có response từ agent"
             
-            logger.info(f"📥 Nhận response từ {self.agent_name}: {content[:100]}...")
+            logger.info(f"📥 Nhận response từ {self.agent_name}: {content['text'][:100]}...")
             return content
             
         except Exception as e:
@@ -291,7 +298,7 @@ class A2AClientManager:
                 "enabled": True
             },
             "Order Agent": {
-                "url": os.getenv("ORDER_AGENT_URL", "http://localhost:10003"),
+                "url": os.getenv("ORDER_AGENT_URL", "http://localhost:10000"),
                 "enabled": True
             }
         }
@@ -309,11 +316,18 @@ class A2AClientManager:
             )
             # Test connection
             await self.redis_client.ping()
+            
+            # Khởi tạo optimized Redis client và health monitor
+            self.optimized_redis_client = OptimizedRedisClient(self.redis_client)
+            self.redis_health_monitor = RedisHealthMonitor(self.redis_client)
+            
             logger.info("✅ Redis connection khởi tạo thành công")
         except Exception as e:
             logger.error(f"❌ Lỗi khi khởi tạo Redis connection: {e}")
             logger.warning("⚠️ Sẽ sử dụng in-memory storage cho chat history")
             self.redis_client = None
+            self.optimized_redis_client = None
+            self.redis_health_monitor = None
         
         for agent_name, config in self.agents_config.items():
             if config["enabled"]:
@@ -345,17 +359,9 @@ class A2AClientManager:
         agent_client = self.agents[agent_name]
         
         # Lấy context từ chat history (sử dụng Redis nếu có user_id)
-        context = None
-        if session_id:
-            if user_id and self.redis_client:
-                chat_history = await self._load_chat_history_from_redis(user_id, session_id)
-                if chat_history:
-                    context = chat_history.get_context_string()
-            elif session_id in self.chat_histories:
-                context = self.chat_histories[session_id].get_context_string()
         
         # Gửi message với files và user_id
-        response = await agent_client.send_message(message, context, files, user_id)
+        response = await agent_client.send_message(message, None, files, user_id)
         
         # Lưu vào chat history
         if session_id:
@@ -368,12 +374,12 @@ class A2AClientManager:
             if user_id and self.redis_client:
                 # Sử dụng Redis
                 chat_history = await self._ensure_chat_history_with_redis(user_id, session_id)
-                chat_history.add_message("assistant", response, agent_name)
+                chat_history.add_message("assistant", response.get("text", ""), agent_name)
                 await self._save_chat_history_to_redis(user_id, session_id, chat_history)
             else:
                 # Fallback to in-memory
                 self._ensure_chat_history(session_id)
-                self.chat_histories[session_id].add_message("assistant", response, agent_name)
+                self.chat_histories[session_id].add_message("assistant", response.get("text", ""), agent_name)
         
         return response
 
@@ -497,13 +503,13 @@ class A2AClientManager:
             del self.chat_histories[session_id]
     
     async def get_user_sessions(self, user_id: str) -> List[str]:
-        """Lấy danh sách tất cả sessions của user từ Redis"""
-        if not user_id or not self.redis_client:
+        """Lấy danh sách tất cả sessions của user từ Redis (sử dụng optimized client)"""
+        if not user_id or not self.optimized_redis_client:
             return []
         
         try:
             pattern = self._get_user_sessions_pattern(user_id)
-            keys = await self.redis_client.keys(pattern)
+            keys = await self.optimized_redis_client.get_all_keys_by_pattern(pattern, max_keys=1000)
             # Extract session_id từ keys
             sessions = []
             for key in keys:
@@ -517,12 +523,42 @@ class A2AClientManager:
             logger.error(f"❌ Lỗi khi lấy user sessions từ Redis: {e}")
             return []
 
+    async def redis_health_check(self) -> dict:
+        """Thực hiện Redis health check chi tiết"""
+        if not self.redis_health_monitor:
+            return {"error": "Redis health monitor not available"}
+        
+        return await self.redis_health_monitor.health_check()
+    
+    async def redis_performance_report(self) -> dict:
+        """Tạo Redis performance report"""
+        if not self.redis_health_monitor:
+            return {"error": "Redis health monitor not available"}
+        
+        return await self.redis_health_monitor.performance_report()
+    
+    async def cleanup_expired_sessions(self, ttl_threshold: int = 86400) -> int:
+        """Cleanup các chat history sessions đã expired"""
+        if not self.optimized_redis_client:
+            return 0
+        
+        pattern = "chat_history:*"
+        return await self.optimized_redis_client.cleanup_expired_sessions(pattern, ttl_threshold)
+
     async def cleanup(self):
         """Cleanup tất cả resources"""
         logger.info("🔄 Cleanup A2A Client Manager...")
         
         for agent_name, agent_client in self.agents.items():
             await agent_client.close()
+        
+        # Cleanup expired sessions trước khi đóng connection
+        if self.optimized_redis_client:
+            try:
+                cleaned_count = await self.cleanup_expired_sessions()
+                logger.info(f"🧹 Đã cleanup {cleaned_count} expired sessions")
+            except Exception as e:
+                logger.error(f"❌ Lỗi khi cleanup expired sessions: {e}")
         
         # Đóng Redis connection
         if self.redis_client:

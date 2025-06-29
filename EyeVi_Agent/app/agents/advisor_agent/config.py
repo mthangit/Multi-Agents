@@ -42,6 +42,8 @@ class Config:
     DOMAIN = "eyewear_advisor"
     ENABLE_PRODUCT_RECOMMENDATIONS = os.getenv("ENABLE_PRODUCT_RECOMMENDATIONS", "true").lower() == "true"
     ENABLE_TECHNICAL_ADVICE = os.getenv("ENABLE_TECHNICAL_ADVICE", "true").lower() == "true"
+    
+    
 
 # Model recommendations by use case
 EMBEDDING_RECOMMENDATIONS = {

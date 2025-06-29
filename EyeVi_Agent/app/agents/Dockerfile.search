@@ -1,0 +1,48 @@
+# Dockerfile cho Search Agent
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create working directory
+WORKDIR /app
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy search agent source code
+COPY search_agent/ ./search_agent/
+
+# Copy environment file
+COPY search_agent/.env ./search_agent/.env
+
+# Create non-root user
+RUN useradd --create-home --shell /bin/bash agent_user && \
+    chown -R agent_user:agent_user /app
+USER agent_user
+
+# Create logs directory
+RUN mkdir -p /app/logs
+
+# Expose port
+EXPOSE 10002
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:10002/ || exit 1
+
+# Working directory for search agent
+WORKDIR /app/search_agent
+
+# Start search agent (uses env vars SEARCH_AGENT_HOST and SEARCH_AGENT_PORT)
+CMD ["python", "run_server.py"]
