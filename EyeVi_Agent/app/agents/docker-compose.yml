@@ -12,18 +12,19 @@ services:
       - "8000:8000"
     volumes:
       - host_agent_logs:/app/logs 
-    networks:
-      - eyevi_network
     depends_on:
-      - order_agent
-      - advisor_agent
-      - search_agent
+      order_agent:
+        condition: service_healthy
+      advisor_agent:
+        condition: service_healthy
+      search_agent:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 60s
 
   # Order Agent Service - Product & order management
   # Internal URL: http://order_agent:10000
@@ -37,10 +38,8 @@ services:
       - "10000:10000"
     volumes:
       - order_agent_logs:/app/logs
-    networks:
-      - eyevi_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10000/"]
+      test: ["CMD", "curl", "-f", "http://localhost:10000/.well-known/agent.json"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -59,10 +58,8 @@ services:
     volumes:
       - advisor_agent_logs:/app/logs
       - ./advisor_agent/data:/app/advisor_agent/data:ro
-    networks:
-      - eyevi_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10001/"]
+      test: ["CMD", "curl", "-f", "http://localhost:10001/.well-known/agent.json"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -80,10 +77,8 @@ services:
       - "10002:10002"
     volumes:
       - search_agent_logs:/app/logs
-    networks:
-      - eyevi_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:10002/"]
+      test: ["CMD", "curl", "-f", "http://localhost:10002/.well-known/agent.json"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -97,9 +92,4 @@ volumes:
   advisor_agent_logs:
     driver: local
   search_agent_logs:
-    driver: local
-
-networks:
-  eyevi_network:
-    driver: bridge
-    name: eyevi_network 
+    driver: local 

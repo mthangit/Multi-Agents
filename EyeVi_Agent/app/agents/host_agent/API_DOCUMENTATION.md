@@ -53,6 +53,20 @@ REDIS_DB=0
 # Server Configuration (Optional)
 HOST=0.0.0.0
 PORT=8080
+
+# Agent URLs (Optional - defaults to container names)
+ADVISOR_AGENT_URL=http://advisor_agent:10001
+SEARCH_AGENT_URL=http://search_agent:10002
+ORDER_AGENT_URL=http://order_agent:10000
+
+# Retry Configuration (Optional - có default values)
+AGENT_MAX_RETRIES=3
+AGENT_RETRY_DELAY_BASE=1.0
+AGENT_RETRY_EXPONENTIAL_BASE=2.0
+
+# Logging Configuration (Optional)
+LOG_LEVEL=INFO
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
 ```
 
 ### **Response Format**
@@ -105,6 +119,8 @@ User Request → Host Agent → [Orchestrator LLM] → Selected Agent → Respon
 - ✅ **Seamless Response**: Không nhắc đến agent source trong response
 - ✅ **File Upload Support**: Hỗ trợ multiple files với đa dạng format
 - ✅ **Pagination**: Chat history với pagination (50 messages gần nhất)
+- ✅ **Auto Retry**: Tự động retry khi agent connection fail với exponential backoff
+- ✅ **Comprehensive Logging**: Log chi tiết về domain, retry attempts, và response times
 
 ---
 
@@ -171,6 +187,43 @@ Hệ thống tự động trích xuất product ID và làm rõ context khi user
 - Files được encode thành base64
 - Tự động detect MIME type
 - Support multiple files trong một request
+
+### **Auto Retry & Error Handling**
+
+**Retry Configuration**:
+- **Max Retries**: 3 lần (configurable via `AGENT_MAX_RETRIES`)
+- **Base Delay**: 1.0 seconds (configurable via `AGENT_RETRY_DELAY_BASE`) 
+- **Exponential Backoff**: 2.0x multiplier (configurable via `AGENT_RETRY_EXPONENTIAL_BASE`)
+
+**Retry Timeline Example**:
+```
+Attempt 1: Immediate
+Attempt 2: After 1.0s  
+Attempt 3: After 2.0s
+Attempt 4: After 4.0s
+Final Failure: Give up
+```
+
+**Retry Triggers**:
+- Agent connection timeout
+- Agent initialization failure  
+- Network connectivity issues
+- Agent temporarily unavailable
+
+**Logging During Retry**:
+```
+🔗 Đang kết nối tới Search Agent tại domain: http://search_agent:10002
+⚠️ Lần thử đầu tiên failed cho Search Agent (send_message): Connection refused
+🔄 Thử lại lần 1/3 cho Search Agent (send_message) sau 1.0s...
+⚠️ Lần thử 1/3 failed cho Search Agent (send_message): Connection timeout  
+🔄 Thử lại lần 2/3 cho Search Agent (send_message) sau 2.0s...
+✅ Search Agent healthy tại http://search_agent:10002 (0.15s)
+```
+
+**Auto Recovery**:
+- Agents tự động được đánh dấu healthy khi connection khôi phục
+- Health check thường xuyên để detect recovery
+- Seamless failover giữa các agents
 
 ---
 
@@ -661,11 +714,17 @@ curl -X POST "http://localhost:8080/chat" \
 
 **Agent Connection Errors**:
 ```bash
-# Agent unavailable
-{"detail": "Search Agent không khả dụng. Vui lòng thử lại sau."}
+# Agent unavailable after retry
+{"detail": "Lỗi khi gửi message tới Search Agent tại http://search_agent:10002 sau 4 lần thử: Connection refused"}
 
-# Timeout
-{"detail": "Request timeout khi kết nối với Advisor Agent"}
+# Agent temporarily unavailable
+{"detail": "Search Agent tại http://search_agent:10002 không khả dụng. Vui lòng thử lại sau."}
+
+# No agents available
+{"detail": "Agent 'Search Agent' không tồn tại. Agents khả dụng: ['Advisor Agent', 'Order Agent']"}
+
+# Initialization failure
+{"detail": "Không thể khởi tạo A2A client cho Order Agent tại http://order_agent:10000: Connection timeout"}
 ```
 
 **Database Errors**:
