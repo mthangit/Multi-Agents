@@ -15,6 +15,7 @@ from datetime import datetime
 # Import các modules local
 from server.host_server import HostServer
 from server.a2a_client_manager import FileInfo
+from db_connector import db_connector
 
 
 import dotenv
@@ -53,6 +54,31 @@ class HealthResponse(BaseModel):
     message: str
     timestamp: str
 
+class ProductResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    gender: Optional[str] = None
+    weight: Optional[float] = None
+    quantity: Optional[int] = None
+    rating: Optional[float] = None
+    newPrice: Optional[float] = None
+    trending: Optional[bool] = None
+    frameMaterial: Optional[str] = None
+    lensMaterial: Optional[str] = None
+    lensFeatures: Optional[str] = None
+    frameShape: Optional[str] = None
+    lensWidth: Optional[float] = None
+    bridgeWidth: Optional[float] = None
+    templeLength: Optional[float] = None
+    color: Optional[str] = None
+    availability: Optional[bool] = None
+    price: Optional[float] = None
+    image_url: Optional[str] = None
+    stock: Optional[int] = None
+
 @app.on_event("startup")
 async def startup_event():
     """Khởi tạo khi server start"""
@@ -65,6 +91,8 @@ async def shutdown_event():
     """Cleanup khi server shutdown"""
     logger.info("🔄 Host Agent Server đang shutdown...")
     await host_server.cleanup()
+    # Đóng kết nối database
+    db_connector.close()
     logger.info("✅ Host Agent Server đã shutdown thành công!")
 
 @app.get("/", response_model=HealthResponse)
@@ -175,7 +203,52 @@ async def chat(
             detail=f"Lỗi khi xử lý message: {str(e)}"
         )
 
+@app.get("/products/{product_id}", response_model=Optional[ProductResponse])
+async def get_product(product_id: str):
+    """
+    Lấy thông tin sản phẩm theo ID
+    """
+    try:
+        logger.info(f"🔍 Đang tìm sản phẩm với ID: {product_id}")
+        product = db_connector.get_product_by_id(product_id)
+        
+        if not product:
+            logger.warning(f"❌ Không tìm thấy sản phẩm với ID: {product_id}")
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy sản phẩm với ID: {product_id}")
+        
+        logger.info(f"✅ Đã tìm thấy sản phẩm: {product.get('name', 'Unknown')}")
+        return product
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy thông tin sản phẩm: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy thông tin sản phẩm: {str(e)}")
 
+@app.get("/products", response_model=List[ProductResponse])
+async def get_products_by_ids(product_ids: str):
+    """
+    Lấy thông tin nhiều sản phẩm theo danh sách ID
+    
+    Query param: product_ids - Danh sách ID sản phẩm, phân cách bởi dấu phẩy
+    Example: /products?product_ids=1,2,3
+    """
+    try:
+        id_list = [id.strip() for id in product_ids.split(",")]
+        logger.info(f"🔍 Đang tìm {len(id_list)} sản phẩm")
+        
+        products = db_connector.get_products_by_ids(id_list)
+        
+        if not products:
+            logger.warning(f"❌ Không tìm thấy sản phẩm nào")
+            return []
+        
+        logger.info(f"✅ Đã tìm thấy {len(products)} sản phẩm")
+        return products
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy thông tin sản phẩm: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy thông tin sản phẩm: {str(e)}")
 
 @app.get("/agents/status")
 async def get_agents_status():
