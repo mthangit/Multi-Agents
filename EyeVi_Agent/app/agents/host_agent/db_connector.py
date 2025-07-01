@@ -43,7 +43,7 @@ class DatabaseConnector:
         try:
             conn = self.get_connection()
             with conn.cursor() as cursor:
-                cursor.execute("SELECT id, images, newPrice FROM products WHERE id = %s", (product_id,))
+                cursor.execute("SELECT id, name, images, newPrice FROM products WHERE id = %s", (product_id,))
                 product = cursor.fetchone()
                 
                 # Xử lý trường images nếu có
@@ -78,7 +78,7 @@ class DatabaseConnector:
             conn = self.get_connection()
             with conn.cursor() as cursor:
                 placeholders = ', '.join(['%s'] * len(product_ids))
-                query = f"SELECT id, images, newPrice FROM products WHERE id IN ({placeholders})"
+                query = f"SELECT id, name, images, newPrice FROM products WHERE id IN ({placeholders})"
                 cursor.execute(query, product_ids)
                 products = cursor.fetchall()
                 

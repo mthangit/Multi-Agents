@@ -56,6 +56,7 @@ class HealthResponse(BaseModel):
 
 class ProductResponse(BaseModel):
     id: int
+    name: str
     images: Optional[str] = None  # dạng JSON string
     newPrice: Optional[float] = None
     image_url: Optional[str] = None  
