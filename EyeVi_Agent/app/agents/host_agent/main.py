@@ -56,28 +56,9 @@ class HealthResponse(BaseModel):
 
 class ProductResponse(BaseModel):
     id: int
-    name: str
-    description: Optional[str] = None
-    brand: Optional[str] = None
-    category: Optional[str] = None
-    gender: Optional[str] = None
-    weight: Optional[float] = None
-    quantity: Optional[int] = None
-    rating: Optional[float] = None
+    images: Optional[str] = None  # dạng JSON string
     newPrice: Optional[float] = None
-    trending: Optional[bool] = None
-    frameMaterial: Optional[str] = None
-    lensMaterial: Optional[str] = None
-    lensFeatures: Optional[str] = None
-    frameShape: Optional[str] = None
-    lensWidth: Optional[float] = None
-    bridgeWidth: Optional[float] = None
-    templeLength: Optional[float] = None
-    color: Optional[str] = None
-    availability: Optional[bool] = None
-    price: Optional[float] = None
-    image_url: Optional[str] = None
-    stock: Optional[int] = None
+    image_url: Optional[str] = None  
 
 @app.on_event("startup")
 async def startup_event():
