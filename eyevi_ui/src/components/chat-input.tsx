@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
 import { Send, Paperclip, Mic, Camera, ImageIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -10,13 +10,36 @@ interface ChatInputProps {
   isLoading?: boolean;
 }
 
-const ChatInput = ({ onSendMessage, isLoading = false }: ChatInputProps) => {
+// Tạo ref type để export
+export interface ChatInputRef {
+  setInputMessage: (text: string) => void;
+  focusInput: () => void;
+}
+
+const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isLoading = false }, ref) => {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Expose methods to parent components via ref
+  useImperativeHandle(ref, () => ({
+    setInputMessage: (text: string) => {
+      setMessage(text);
+      // Auto-resize textarea after setting text
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      }, 0);
+    },
+    focusInput: () => {
+      textareaRef.current?.focus();
+    }
+  }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,6 +221,8 @@ const ChatInput = ({ onSendMessage, isLoading = false }: ChatInputProps) => {
       </form>
     </div>
   );
-};
+});
+
+ChatInput.displayName = "ChatInput";
 
 export default ChatInput; 

@@ -4,12 +4,15 @@ import React, { useState, useEffect } from "react";
 import { Eye, Plus, Settings, HelpCircle, Paperclip, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "./ui/button";
 import Link from "next/link";
+import { useChatApi, FIXED_USER_ID } from "@/hooks/useChatApi";
 
 interface SessionInfo {
   id: string;
   title?: string;
   created_at?: string;
   last_updated?: string;
+  message_count?: number;
+  last_message_preview?: string;
 }
 
 interface SidebarProps {
@@ -20,12 +23,13 @@ interface SidebarProps {
 
 const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
   const [activeSessions, setActiveSessions] = useState<SessionInfo[]>([]);
+  const { clearChatHistory } = useChatApi();
   
   // Lấy danh sách các phiên hoạt động
   useEffect(() => {
     const fetchSessions = async () => {
       try {
-        const response = await fetch("http://localhost:8080/sessions");
+        const response = await fetch(`/api/users/${FIXED_USER_ID}/sessions`);
         if (response.ok) {
           const data = await response.json();
           setActiveSessions(data.sessions || []);
@@ -37,6 +41,17 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
     
     fetchSessions();
   }, [sessionId]);
+
+  const handleClearHistory = async () => {
+    if (onClearHistory) {
+      onClearHistory();
+    } else {
+      const success = await clearChatHistory();
+      if (success && onNewChat) {
+        onNewChat();
+      }
+    }
+  };
 
   return (
     <div className="flex flex-col w-72 h-screen bg-sidebar border-r border-sidebar-border p-3 text-sidebar-foreground">
@@ -62,11 +77,13 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
         <div className="text-sm font-medium mb-2 px-2">Gần đây</div>
         <div className="space-y-1">
           {activeSessions.length > 0 ? (
-            activeSessions.map(session => (
+            activeSessions.map((session, index) => (
               <ChatHistoryItem 
-                key={session.id}
-                title={session.title || `Cuộc hội thoại ${session.id.slice(0, 8)}`} 
+                key={session.id || `session-${index}`}
+                title={session.title || `Cuộc hội thoại ${session.id}`} 
                 active={session.id === sessionId} 
+                messageCount={session.message_count}
+                preview={session.last_message_preview}
               />
             ))
           ) : (
@@ -78,6 +95,7 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
           {/* Fallback nếu không có session từ API */}
           {activeSessions.length === 0 && sessionId && (
             <ChatHistoryItem 
+              key="current-session"
               title={`Cuộc hội thoại hiện tại`}
               active={true}
             />
@@ -90,7 +108,7 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
         <FooterItem 
           icon={<Trash2 size={16} />} 
           text="Xóa lịch sử" 
-          onClick={onClearHistory}
+          onClick={handleClearHistory}
         />
         <FooterItem icon={<Paperclip size={16} />} text="Đính kèm tệp" />
         <FooterItem icon={<Sparkles size={16} />} text="Nâng cấp tài khoản" />
@@ -102,7 +120,14 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
 };
 
 // Chat history item component
-const ChatHistoryItem = ({ title, active }: { title: string; active: boolean }) => {
+interface ChatHistoryItemProps {
+  title: string;
+  active: boolean;
+  messageCount?: number;
+  preview?: string;
+}
+
+const ChatHistoryItem = ({ title, active, messageCount, preview }: ChatHistoryItemProps) => {
   return (
     <button
       className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -111,7 +136,19 @@ const ChatHistoryItem = ({ title, active }: { title: string; active: boolean }) 
           : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
       }`}
     >
-      {title}
+      <div className="flex flex-col">
+        <span>{title}</span>
+        {preview && (
+          <span className="text-xs text-muted-foreground truncate mt-1">
+            {preview}
+          </span>
+        )}
+        {messageCount && (
+          <span className="text-xs text-muted-foreground mt-0.5">
+            {messageCount} tin nhắn
+          </span>
+        )}
+      </div>
     </button>
   );
 };
