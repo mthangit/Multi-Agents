@@ -55,7 +55,7 @@ class HealthResponse(BaseModel):
     timestamp: str
 
 class ProductResponse(BaseModel):
-    id: str
+    id: int
     name: str
     description: Optional[str] = None
     brand: Optional[str] = None
