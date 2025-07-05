@@ -257,22 +257,22 @@ class HostServer:
                 # Lưu tin nhắn vào LangChain memory và MySQL
                 await self._save_messages_to_memory_with_agent(
                     user_message=message,
-                    ai_response=agent_response_data["text"], 
+                    ai_response=agent_response_data.get("text", ""), 
                     user_id=user_id, 
                     session_id=session_id, 
                     clarified_message=clarified_message,
                     agent_name=decision["selected_agent"],
-                    response_data=agent_response_data.get("data"),
-                    analysis=decision.get("analysis")
+                    response_data=agent_response_data.get("data", []),
+                    analysis=decision.get("analysis", "")
                 )
 
                 return {    
-                    "response": agent_response_data["text"],
+                    "response": agent_response_data.get("text", ""),
                     "agent_used": decision["selected_agent"],
                     "analysis": decision.get("analysis", ""),
                     "clarified_message": clarified_message,
                     "session_id": session_id,
-                    "data": agent_response_data["data"],
+                    "data": agent_response_data.get("data", []),
                     "user_info": agent_response_data.get("user_info", {}),
                     "orders": agent_response_data.get("orders", []),
                     "extracted_product_ids": decision.get("extracted_product_ids", [])
@@ -289,9 +289,9 @@ class HostServer:
                     session_id=session_id, 
                     clarified_message=clarified_message,
                     agent_name="Host Agent",
-                    analysis=decision.get("analysis")
+                    analysis=decision.get("analysis", "")
                 )
-                                
+
                 return {
                     "response": direct_response,
                     "agent_used": None,
@@ -386,7 +386,7 @@ class HostServer:
                     clarified_message=None,
                     agent_name="Search Agent",
                     files=files,
-                    response_data=agent_response_data.get("data"),
+                    response_data=agent_response_data.get("data", []),
                     analysis=None
                 )
                 

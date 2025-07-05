@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY advisor_agent/lib-advisor.txt ./
+RUN pip install --no-cache-dir -r lib-advisor.txt
 
 # Copy advisor agent source code
 COPY advisor_agent/ ./advisor_agent/
@@ -37,12 +37,8 @@ RUN mkdir -p /app/logs
 # Expose port
 EXPOSE 10001
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:10001/ || exit 1
-
 # Working directory for advisor agent
 WORKDIR /app/advisor_agent
 
 # Start advisor agent with skip-checks flag
-CMD ["python", "a2a_main.py", "--host", "0.0.0.0", "--port", "10001", "--skip-checks"] 
+CMD ["uvicorn", "advisor_agent.main:app", "--host", "0.0.0.0", "--port", "10001"] 

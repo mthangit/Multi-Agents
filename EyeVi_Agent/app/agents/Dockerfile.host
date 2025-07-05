@@ -1,5 +1,4 @@
-# Dockerfile cho Host Agent
-FROM python:3.11-slim
+FROM python:3.13-slim
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -7,7 +6,6 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install system dependencies
 RUN apt-get update && apt-get install -y \
     build-essential \
     curl \
@@ -16,9 +14,10 @@ RUN apt-get update && apt-get install -y \
 # Create working directory
 WORKDIR /app
 
-# Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy lib-host.txt for dependencies
+COPY host_agent/lib-host.txt ./
+
+RUN pip install --no-cache-dir -r lib-host.txt
 
 # Copy host agent source code
 COPY host_agent/ ./host_agent/
@@ -45,4 +44,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 WORKDIR /app/host_agent
 
 # Start host agent
-CMD ["python", "run_server.py"] 
+CMD ["python", "run_server.py"]

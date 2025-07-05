@@ -17,8 +17,8 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Copy requirements and install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY search_agent/lib-search.txt ./
+RUN pip install --no-cache-dir -r lib-search.txt
 
 # Copy search agent source code
 COPY search_agent/ ./search_agent/
@@ -37,12 +37,8 @@ RUN mkdir -p /app/logs
 # Expose port
 EXPOSE 10002
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:10002/ || exit 1
-
 # Working directory for search agent
 WORKDIR /app/search_agent
 
 # Start search agent (uses env vars SEARCH_AGENT_HOST and SEARCH_AGENT_PORT)
-CMD ["python", "run_server.py"]
+CMD ["uvicorn", "search_agent.main:app", "--host", "0.0.0.0", "--port", "10002"]
