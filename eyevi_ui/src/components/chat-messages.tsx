@@ -4,8 +4,9 @@ import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { User, Bot, Loader2 } from "lucide-react";
 import Image from "next/image";
-import { ProductData } from "@/hooks/useChatApi";
+import { ProductData, OrderData } from "@/hooks/useChatApi";
 import ProductList from "./product-list";
+import OrderList from "./order-list";
 
 interface Attachment {
   name: string;
@@ -21,6 +22,7 @@ interface Message {
   attachments?: Attachment[];
   products?: ProductData[];
   extracted_product_ids?: string[];
+  orders?: OrderData[];
   agent_used?: string;
   is_loading?: boolean;
   loading_step?: string;
@@ -142,6 +144,12 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
                 {message.extracted_product_ids && message.extracted_product_ids.length > 0 && (
                   <div className="mt-2 w-full">
                     <ProductList productIds={message.extracted_product_ids} maxDisplay={3} />
+                  </div>
+                )}
+
+                {message.orders && message.orders.length > 0 && (
+                  <div className="mt-2 w-full">
+                    <OrderList orders={message.orders} initialDisplay={2} loadMoreCount={5} />
                   </div>
                 )}
               </>

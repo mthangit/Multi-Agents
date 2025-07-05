@@ -5,7 +5,7 @@ import ChatHeader from "./chat-header";
 import ChatMessages from "./chat-messages";
 import ChatInput, { ChatInputRef } from "./chat-input";
 import ProductList from "./product-list";
-import { useChatApi, ProductData } from "@/hooks/useChatApi";
+import { useChatApi, ProductData, OrderData } from "@/hooks/useChatApi";
 
 // Tạo context để truy cập chatInputRef từ các component khác
 interface ChatContextType {
@@ -30,6 +30,7 @@ interface ContainerMessage {
   timestamp: string;
   products?: ProductData[];
   extracted_product_ids?: string[];
+  orders?: OrderData[];
   agent_used?: string;
   is_loading?: boolean;
   loading_step?: string;
@@ -44,6 +45,7 @@ interface ChatMessage {
   attachments?: Array<{name: string; url: string; type: string}>;
   products?: ProductData[];
   extracted_product_ids?: string[];
+  orders?: OrderData[];
   agent_used?: string;
   is_loading?: boolean;
   loading_step?: string;
@@ -154,6 +156,7 @@ const ChatContainer = () => {
         timestamp: new Date().toISOString(),
         products: response.data,
         extracted_product_ids: response.extracted_product_ids,
+        orders: response.orders,
         agent_used: response.agent_used,
         is_loading: false,
       };
@@ -208,6 +211,7 @@ const ChatContainer = () => {
         attachments: [],
         products: msg.products,
         extracted_product_ids: msg.extracted_product_ids,
+        orders: msg.orders,
         agent_used: msg.agent_used,
         is_loading: msg.is_loading,
         loading_step: msg.loading_step,

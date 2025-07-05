@@ -58,6 +58,22 @@ export interface ProductData {
   newPrice?: number;
 }
 
+// Interface cho Order Data
+export interface OrderData {
+  id: number;
+  user_id: number;
+  total_items: number;
+  total_price: number;
+  actual_price: number;
+  shipping_address: string;
+  phone: string;
+  order_status: string;
+  created_at: string;
+  updated_at: string;
+  user_name: string;
+  user_email: string;
+}
+
 export interface Message {
   id: string;
   content: string;
@@ -70,6 +86,7 @@ export interface Message {
   }[];
   products?: ProductData[];
   extracted_product_ids?: string[];
+  orders?: OrderData[];
 }
 
 interface ChatResponse {
@@ -84,11 +101,7 @@ interface ChatResponse {
     name: string;
     phone: string;
   };
-  orders?: {
-    order_id: string;
-    status: string;
-    total: string;
-  }[];
+  orders?: OrderData[];
   extracted_product_ids?: string[];
   status: string;
   timestamp: string;
