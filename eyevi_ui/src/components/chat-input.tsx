@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
-import { Send, Paperclip, Mic, Camera, ImageIcon } from "lucide-react";
+import { Send, Paperclip, ImageIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
@@ -22,7 +22,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   // Expose methods to parent components via ref
   useImperativeHandle(ref, () => ({
@@ -84,12 +83,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
     }
   };
 
-  const handleTakePhoto = () => {
-    if (!isLoading) {
-      cameraInputRef.current?.click();
-    }
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
@@ -121,36 +114,6 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
             className="hidden" 
             onChange={handleFileChange}
             multiple
-            disabled={isLoading}
-          />
-          
-          <Button 
-            type="button" 
-            size="icon" 
-            variant="outline" 
-            aria-label="Ghi âm"
-            disabled={isLoading}
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
-          
-          <Button 
-            type="button" 
-            size="icon" 
-            variant="outline" 
-            aria-label="Chụp ảnh"
-            onClick={handleTakePhoto}
-            disabled={isLoading}
-          >
-            <Camera className="h-4 w-4" />
-          </Button>
-          <input 
-            type="file" 
-            ref={cameraInputRef} 
-            className="hidden" 
-            onChange={handleFileChange}
-            accept="image/*" 
-            capture="environment"
             disabled={isLoading}
           />
           
