@@ -1,3 +1,5 @@
+const backendUrl = process.env.BACKEND_URL || 'https://eyevi-backend.devsecopstech.click';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -21,7 +23,7 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: 'https://eyevi-backend.devsecopstech.click/:path*',
+        destination: `${backendUrl}/:path*`,
       },
     ];
   },
