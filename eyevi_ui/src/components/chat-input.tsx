@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useRef } from "react";
-import { Send, Paperclip, Mic, Camera, ImageIcon } from "lucide-react";
+import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
+import { Send, Paperclip, ImageIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 
@@ -10,13 +10,35 @@ interface ChatInputProps {
   isLoading?: boolean;
 }
 
-const ChatInput = ({ onSendMessage, isLoading = false }: ChatInputProps) => {
+// Tạo ref type để export
+export interface ChatInputRef {
+  setInputMessage: (text: string) => void;
+  focusInput: () => void;
+}
+
+const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isLoading = false }, ref) => {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Expose methods to parent components via ref
+  useImperativeHandle(ref, () => ({
+    setInputMessage: (text: string) => {
+      setMessage(text);
+      // Auto-resize textarea after setting text
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.style.height = "auto";
+          textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`;
+        }
+      }, 0);
+    },
+    focusInput: () => {
+      textareaRef.current?.focus();
+    }
+  }));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,12 +83,6 @@ const ChatInput = ({ onSendMessage, isLoading = false }: ChatInputProps) => {
     }
   };
 
-  const handleTakePhoto = () => {
-    if (!isLoading) {
-      cameraInputRef.current?.click();
-    }
-  };
-
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
@@ -98,36 +114,6 @@ const ChatInput = ({ onSendMessage, isLoading = false }: ChatInputProps) => {
             className="hidden" 
             onChange={handleFileChange}
             multiple
-            disabled={isLoading}
-          />
-          
-          <Button 
-            type="button" 
-            size="icon" 
-            variant="outline" 
-            aria-label="Ghi âm"
-            disabled={isLoading}
-          >
-            <Mic className="h-4 w-4" />
-          </Button>
-          
-          <Button 
-            type="button" 
-            size="icon" 
-            variant="outline" 
-            aria-label="Chụp ảnh"
-            onClick={handleTakePhoto}
-            disabled={isLoading}
-          >
-            <Camera className="h-4 w-4" />
-          </Button>
-          <input 
-            type="file" 
-            ref={cameraInputRef} 
-            className="hidden" 
-            onChange={handleFileChange}
-            accept="image/*" 
-            capture="environment"
             disabled={isLoading}
           />
           
@@ -198,6 +184,8 @@ const ChatInput = ({ onSendMessage, isLoading = false }: ChatInputProps) => {
       </form>
     </div>
   );
-};
+});
+
+ChatInput.displayName = "ChatInput";
 
 export default ChatInput; 

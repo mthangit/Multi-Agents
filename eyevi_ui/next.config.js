@@ -1,12 +1,31 @@
+const backendUrl = process.env.BACKEND_URL || 'https://eyevi-backend.devsecopstech.click';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
     // Tắt ESLint trong quá trình build
     ignoreDuringBuilds: true,
   },
-  // Tắt cảnh báo về việc sử dụng thẻ img
+  // Cấu hình domains cho hình ảnh
   images: {
-    domains: ['*'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'product.hstatic.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'placehold.co',
+      },
+    ],
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${backendUrl}/:path*`,
+      },
+    ];
   },
 }
 

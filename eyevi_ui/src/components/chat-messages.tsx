@@ -2,8 +2,11 @@
 
 import { useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
-import { User, Bot } from "lucide-react";
+import { User, Bot, Loader2 } from "lucide-react";
 import Image from "next/image";
+import { ProductData, OrderData } from "@/hooks/useChatApi";
+import ProductList from "./product-list";
+import OrderList from "./order-list";
 
 interface Attachment {
   name: string;
@@ -17,6 +20,12 @@ interface Message {
   sender: "user" | "bot";
   timestamp: Date;
   attachments?: Attachment[];
+  products?: ProductData[];
+  extracted_product_ids?: string[];
+  orders?: OrderData[];
+  agent_used?: string;
+  is_loading?: boolean;
+  loading_step?: string;
 }
 
 interface ChatMessagesProps {
@@ -81,6 +90,12 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
           )}
           
           <div className="flex flex-col gap-1 max-w-[80%]">
+            {message.sender === "bot" && message.agent_used && !message.is_loading && (
+              <span className="text-xs text-muted-foreground font-medium">
+                Agent trả lời: {message.agent_used}
+              </span>
+            )}
+            
             <div
               className={cn(
                 "rounded-xl p-3",
@@ -89,7 +104,23 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
                   : "bg-muted rounded-tl-none"
               )}
             >
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              {message.is_loading ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                    <span className="text-sm text-muted-foreground font-medium animate-pulse">
+                      {message.loading_step || "Đang xử lý..."}
+                    </span>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-muted-foreground/30 animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                    <span className="w-2 h-2 rounded-full bg-muted-foreground/30 animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                    <span className="w-2 h-2 rounded-full bg-muted-foreground/30 animate-bounce" style={{ animationDelay: "600ms" }}></span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              )}
             </div>
             
             {message.attachments && message.attachments.length > 0 && (
@@ -100,6 +131,28 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
                   </div>
                 ))}
               </div>
+            )}
+            
+            {message.sender === "bot" && !message.is_loading && (
+              <>
+                {message.products && message.products.length > 0 && (
+                  <div className="mt-2 w-full">
+                    <ProductList products={message.products} maxDisplay={3} />
+                  </div>
+                )}
+                
+                {message.extracted_product_ids && message.extracted_product_ids.length > 0 && (
+                  <div className="mt-2 w-full">
+                    <ProductList productIds={message.extracted_product_ids} maxDisplay={3} />
+                  </div>
+                )}
+
+                {message.orders && message.orders.length > 0 && (
+                  <div className="mt-2 w-full">
+                    <OrderList orders={message.orders} initialDisplay={2} loadMoreCount={5} />
+                  </div>
+                )}
+              </>
             )}
             
             <span
