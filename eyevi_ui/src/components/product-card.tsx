@@ -130,7 +130,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct, prod
     if (product) {
       const productId = product.product_id;
       const productName = product.name || "Sản phẩm kính mắt";
-      setChatInputMessage(`Tôi muốn mua sản phẩm ${productName} với id ${productId}`);
+      setChatInputMessage(`Tôi muốn mua sản phẩm ${productName} với mã sản phẩm ${productId}`);
     }
   };
   

@@ -243,8 +243,6 @@ const ChatContainer = () => {
         <ChatHeader onNewChat={handleNewChat} />
         <div className="flex-1 overflow-hidden flex flex-col">
           <ChatMessages messages={transformMessages()} />
-          {products.length > 0 && <ProductList products={products} />}
-          {productIds.length > 0 && products.length === 0 && <ProductList productIds={productIds} />}
         </div>
         <ChatInput ref={chatInputRef} onSendMessage={handleSendMessage} isLoading={isLoading || loadingMessageId !== null} />
       </div>
