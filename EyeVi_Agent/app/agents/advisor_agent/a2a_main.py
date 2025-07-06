@@ -66,7 +66,7 @@ def check_prerequisites():
 
 
 @click.command()
-@click.option('--host', 'host', default='localhost', help='Host to bind to')
+@click.option('--host', 'host', default='0.0.0.0', help='Host to bind to')
 @click.option('--port', 'port', default=10001, help='Port to bind to')
 @click.option('--skip-checks', is_flag=True, help='Skip prerequisite checks')
 def main(host, port, skip_checks):

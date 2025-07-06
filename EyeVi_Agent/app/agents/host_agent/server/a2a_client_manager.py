@@ -10,6 +10,7 @@ import json
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 from uuid import uuid4
+import time
 
 import redis.asyncio as aioredis
 from a2a.client import A2AClient, A2ACardResolver
@@ -98,19 +99,61 @@ class A2AAgentClient:
         self.is_initialized = False
         self.last_health_check = None
         self.is_healthy = False
+        
+        # Retry configuration
+        self.max_retries = int(os.getenv("AGENT_MAX_RETRIES", "3"))
+        self.retry_delay_base = float(os.getenv("AGENT_RETRY_DELAY_BASE", "1.0"))  # seconds
+        self.retry_exponential_base = float(os.getenv("AGENT_RETRY_EXPONENTIAL_BASE", "2.0"))
+
+    async def _retry_with_backoff(self, func, func_name: str, *args, **kwargs):
+        """Thực hiện retry với exponential backoff"""
+        last_exception = None
+        
+        for attempt in range(self.max_retries + 1):
+            try:
+                if attempt > 0:
+                    delay = self.retry_delay_base * (self.retry_exponential_base ** (attempt - 1))
+                    logger.info(f"🔄 Thử lại lần {attempt}/{self.max_retries} cho {self.agent_name} ({func_name}) sau {delay:.1f}s...")
+                    await asyncio.sleep(delay)
+                
+                return await func(*args, **kwargs)
+                
+            except Exception as e:
+                last_exception = e
+                if attempt == 0:
+                    logger.warning(f"⚠️ Lần thử đầu tiên failed cho {self.agent_name} ({func_name}): {str(e)}")
+                else:
+                    logger.warning(f"⚠️ Lần thử {attempt}/{self.max_retries} failed cho {self.agent_name} ({func_name}): {str(e)}")
+                
+                if attempt == self.max_retries:
+                    logger.error(f"❌ Đã thử {self.max_retries + 1} lần nhưng vẫn fail cho {self.agent_name} ({func_name})")
+                    break
+        
+        # Nếu tất cả retry đều fail
+        self.is_healthy = False
+        raise last_exception
 
     async def initialize(self):
-        """Khởi tạo A2A client"""
+        """Khởi tạo A2A client với retry logic"""
         if self.is_initialized:
             return True
-            
-        try:
-            logger.info(f"🔄 Khởi tạo A2A client cho {self.agent_name} tại {self.base_url}")
+        
+        async def _do_initialize():
+            logger.info(f"🔗 Đang kết nối tới {self.agent_name} tại domain: {self.base_url}")
             
             # Tạo httpx client
-            self.httpx_client = httpx.AsyncClient(timeout=30.0)
+            self.httpx_client = httpx.AsyncClient(timeout=120.0)
+            
+            try:
+                logger.info(f"🌐 Kiểm tra kết nối cơ bản tới {self.base_url}")
+                test_response = await self.httpx_client.get(f"{self.base_url}/health", timeout=10.0)
+                logger.info(f"✅ Kết nối cơ bản thành công tới {self.base_url} (status: {test_response.status_code})")
+            except Exception as e:
+                logger.warning(f"⚠️ Kết nối cơ bản tới {self.base_url} gặp vấn đề: {e}")
+                # Vẫn tiếp tục thử A2A connection
             
             # Khởi tạo A2ACardResolver để fetch agent card
+            logger.info(f"🏷️ Đang fetch agent card từ {self.base_url}/.well-known/agent.json")
             resolver = A2ACardResolver(
                 httpx_client=self.httpx_client,
                 base_url=self.base_url
@@ -118,8 +161,10 @@ class A2AAgentClient:
             
             # Fetch agent card
             self.agent_card = await resolver.get_agent_card()
+            logger.info(f"📋 Đã tải agent card thành công cho {self.agent_name}")
             
             # Khởi tạo A2A client với agent card
+            logger.info(f"🤖 Đang khởi tạo A2A client cho {self.agent_name}")
             self.a2a_client = A2AClient(
                 httpx_client=self.httpx_client,
                 agent_card=self.agent_card
@@ -130,24 +175,29 @@ class A2AAgentClient:
             self.last_health_check = datetime.now()
             
             logger.info(f"✅ {self.agent_name} A2A client khởi tạo thành công")
-            logger.info(f"   - Name: {self.agent_card.name}")
-            logger.info(f"   - Description: {self.agent_card.description}")
+            logger.info(f"   🏷️  Name: {self.agent_card.name}")
+            logger.info(f"   📝 Description: {self.agent_card.description}")
+            logger.info(f"   🌐 Domain: {self.base_url}")
             
             return True
-            
+        
+        try:
+            return await self._retry_with_backoff(_do_initialize, "initialize")
         except Exception as e:
-            logger.error(f"❌ Lỗi khởi tạo A2A client cho {self.agent_name}: {e}")
-            self.is_healthy = False
+            logger.error(f"❌ Không thể khởi tạo A2A client cho {self.agent_name} tại {self.base_url}: {e}")
             return False
 
     async def send_message(self, message: str, context: Optional[str] = None, files: Optional[List[Any]] = None, user_id: Optional[str] = None) -> str:
-        """Gửi message tới agent qua A2A, có thể kèm files"""
+        """Gửi message tới agent qua A2A, có thể kèm files với retry logic"""
         if not self.is_initialized:
+            logger.info(f"🔄 {self.agent_name} chưa initialized, đang thử khởi tạo...")
             success = await self.initialize()
             if not success:
-                raise Exception(f"Không thể khởi tạo A2A client cho {self.agent_name}")
+                raise Exception(f"Không thể khởi tạo A2A client cho {self.agent_name} tại {self.base_url}")
         
-        try:
+        async def _do_send_message():
+            logger.info(f"🌐 Đang gửi message tới {self.agent_name} tại domain: {self.base_url}")
+            
             # Chuẩn bị message với context nếu có
             full_message = message
             if context:
@@ -194,12 +244,12 @@ class A2AAgentClient:
                 send_message_payload['message']['metadata'] = {'user_id': user_id}
             
             if files:
-                logger.info(f"📤 Gửi message với {len(files)} files tới {self.agent_name}: {message[:100]}...")
+                logger.info(f"📤 Gửi message với {len(files)} files tới {self.agent_name} tại {self.base_url}: {message[:100]}...")
             else:
                 if user_id and self.agent_name == "Order Agent":
-                    logger.info(f"📤 Gửi message tới {self.agent_name} với User ID {user_id}: {message[:100]}...")
+                    logger.info(f"📤 Gửi message tới {self.agent_name} tại {self.base_url} với User ID {user_id}: {message[:100]}...")
                 else:
-                    logger.info(f"📤 Gửi message tới {self.agent_name} qua A2A: {message[:100]}...")
+                    logger.info(f"📤 Gửi message tới {self.agent_name} tại {self.base_url}: {message[:100]}...")
             
             # Tạo request
             request = SendMessageRequest(
@@ -208,10 +258,12 @@ class A2AAgentClient:
             )
             
             # Gửi message
+            start_time = time.time()
             response = await self.a2a_client.send_message(
                 request=request, 
-                http_kwargs={"timeout": None}
+                http_kwargs={"timeout": 360.0}
             )
+            response_time = time.time() - start_time
             
             # Parse response
             response_data = response.model_dump(mode='json', exclude_none=True)
@@ -231,34 +283,51 @@ class A2AAgentClient:
             if not content:
                 content["text"] = "Không có response từ agent"
             
-            logger.info(f"📥 Nhận response từ {self.agent_name}: {content['text'][:100]}...")
-            return content
+            logger.info(f"📥 Nhận response từ {self.agent_name} tại {self.base_url} trong {response_time:.2f}s: {content['text'][:100]}...")
             
+            # Đánh dấu healthy khi gửi message thành công
+            self.is_healthy = True
+            self.last_health_check = datetime.now()
+            
+            return content
+        
+        try:
+            return await self._retry_with_backoff(_do_send_message, "send_message")
         except Exception as e:
-            error_msg = f"Lỗi khi gửi message tới {self.agent_name}: {str(e)}"
+            error_msg = f"Lỗi khi gửi message tới {self.agent_name} tại {self.base_url} sau {self.max_retries + 1} lần thử: {str(e)}"
             logger.error(error_msg)
             self.is_healthy = False
             raise Exception(error_msg)
 
     async def health_check(self) -> bool:
-        """Kiểm tra health của agent"""
-        try:
+        """Kiểm tra health của agent với retry logic"""
+        async def _do_health_check():
             if not self.httpx_client:
                 return False
-                
+            
+            logger.debug(f"🏥 Kiểm tra health cho {self.agent_name} tại {self.base_url}/.well-known/agent.json")
+            
             # Kiểm tra endpoint /.well-known/agent.json
             response = await self.httpx_client.get(
                 f"{self.base_url}/.well-known/agent.json",
                 timeout=5.0
             )
             
-            self.is_healthy = response.status_code == 200
+            is_healthy = response.status_code == 200
+            self.is_healthy = is_healthy
             self.last_health_check = datetime.now()
             
-            return self.is_healthy
+            if is_healthy:
+                logger.debug(f"✅ Health check thành công cho {self.agent_name} tại {self.base_url}")
+            else:
+                logger.warning(f"⚠️ Health check failed cho {self.agent_name} tại {self.base_url} (status: {response.status_code})")
             
+            return is_healthy
+        
+        try:
+            return await self._retry_with_backoff(_do_health_check, "health_check")
         except Exception as e:
-            logger.warning(f"⚠️ Health check failed cho {self.agent_name}: {e}")
+            logger.warning(f"⚠️ Health check failed cho {self.agent_name} tại {self.base_url} sau {self.max_retries + 1} lần thử: {e}")
             self.is_healthy = False
             return False
 
@@ -267,9 +336,9 @@ class A2AAgentClient:
         try:
             if self.httpx_client:
                 await self.httpx_client.aclose()
-            logger.info(f"✅ Đã đóng A2A client cho {self.agent_name}")
+            logger.info(f"✅ Đã đóng A2A client cho {self.agent_name} tại {self.base_url}")
         except Exception as e:
-            logger.error(f"❌ Lỗi khi đóng A2A client cho {self.agent_name}: {e}")
+            logger.error(f"❌ Lỗi khi đóng A2A client cho {self.agent_name} tại {self.base_url}: {e}")
 
 class A2AClientManager:
     """Quản lý tất cả A2A clients cho các agents khác nhau"""
@@ -288,17 +357,18 @@ class A2AClientManager:
         }
         
         # Cấu hình các agents từ environment variables
+        # Sử dụng container names cho Docker environment
         self.agents_config = {
             "Advisor Agent": {
-                "url": os.getenv("ADVISOR_AGENT_URL", "http://advisor_agent:10001"),
+                "url": os.getenv("ADVISOR_AGENT_URL", "http://localhost:10001"),
                 "enabled": True
             },
             "Search Agent": {
-                "url": os.getenv("SEARCH_AGENT_URL", "http://search_agent:10002"),
+                "url": os.getenv("SEARCH_AGENT_URL", "http://localhost:10002"),
                 "enabled": True
             },
             "Order Agent": {
-                "url": os.getenv("ORDER_AGENT_URL", "http://order_agent:10000"),
+                "url": os.getenv("ORDER_AGENT_URL", "http://localhost:10000"),
                 "enabled": True
             }
         }
@@ -309,8 +379,11 @@ class A2AClientManager:
         
         # Khởi tạo Redis connection
         try:
+            redis_url = f"redis://{self.redis_config['host']}:{self.redis_config['port']}/{self.redis_config['db']}"
+            logger.info(f"🔗 Đang kết nối tới Redis tại: {self.redis_config['host']}:{self.redis_config['port']}")
+            
             self.redis_client = aioredis.from_url(
-                f"redis://{self.redis_config['host']}:{self.redis_config['port']}/{self.redis_config['db']}",
+                redis_url,
                 password=self.redis_config['password'],
                 decode_responses=True
             )
@@ -321,16 +394,23 @@ class A2AClientManager:
             self.optimized_redis_client = OptimizedRedisClient(self.redis_client)
             self.redis_health_monitor = RedisHealthMonitor(self.redis_client)
             
-            logger.info("✅ Redis connection khởi tạo thành công")
+            logger.info(f"✅ Redis connection khởi tạo thành công tại {self.redis_config['host']}:{self.redis_config['port']}")
         except Exception as e:
-            logger.error(f"❌ Lỗi khi khởi tạo Redis connection: {e}")
+            logger.error(f"❌ Lỗi khi khởi tạo Redis connection tại {self.redis_config['host']}:{self.redis_config['port']}: {e}")
             logger.warning("⚠️ Sẽ sử dụng in-memory storage cho chat history")
             self.redis_client = None
             self.optimized_redis_client = None
             self.redis_health_monitor = None
         
+        # Khởi tạo các agents
+        initialized_agents = 0
+        total_agents = len([config for config in self.agents_config.values() if config["enabled"]])
+        
+        logger.info(f"🤖 Đang khởi tạo {total_agents} agents...")
+        
         for agent_name, config in self.agents_config.items():
             if config["enabled"]:
+                logger.info(f"🔄 Khởi tạo {agent_name} tại {config['url']}")
                 self.agents[agent_name] = A2AAgentClient(
                     agent_name=agent_name,
                     base_url=config["url"]
@@ -338,11 +418,21 @@ class A2AClientManager:
                 
                 # Thử khởi tạo ngay (không chặn nếu agent không available)
                 try:
-                    await self.agents[agent_name].initialize()
+                    success = await self.agents[agent_name].initialize()
+                    if success:
+                        initialized_agents += 1
+                        logger.info(f"✅ {agent_name} khởi tạo thành công")
+                    else:
+                        logger.warning(f"⚠️ {agent_name} khởi tạo thất bại")
                 except Exception as e:
-                    logger.warning(f"⚠️ Không thể khởi tạo {agent_name}: {e}")
+                    logger.warning(f"⚠️ Không thể khởi tạo {agent_name} tại {config['url']}: {e}")
         
-        logger.info(f"✅ A2A Client Manager đã khởi tạo với {len(self.agents)} agents")
+        logger.info(f"✅ A2A Client Manager đã khởi tạo với {initialized_agents}/{total_agents} agents khả dụng")
+        
+        if initialized_agents == 0:
+            logger.warning("⚠️ Không có agent nào khả dụng. Hệ thống có thể gặp vấn đề khi xử lý requests.")
+        elif initialized_agents < total_agents:
+            logger.warning(f"⚠️ Chỉ có {initialized_agents}/{total_agents} agents khả dụng. Một số chức năng có thể bị hạn chế.")
 
     async def send_message_to_agent(
         self, 
@@ -354,34 +444,65 @@ class A2AClientManager:
     ) -> str:
         """Gửi message tới agent cụ thể, có thể kèm files"""
         if agent_name not in self.agents:
-            raise ValueError(f"Agent '{agent_name}' không tồn tại")
+            available_agents = list(self.agents.keys())
+            raise ValueError(f"Agent '{agent_name}' không tồn tại. Agents khả dụng: {available_agents}")
         
         agent_client = self.agents[agent_name]
         
-        # Lấy context từ chat history (sử dụng Redis nếu có user_id)
+        # Log thông tin về request
+        if files:
+            file_names = [f.name for f in files if hasattr(f, 'name')]
+            logger.info(f"📤 Manager gửi message tới {agent_name} với {len(files)} files: [{', '.join(file_names)}]")
+        else:
+            logger.info(f"📤 Manager gửi message tới {agent_name}: {message[:100]}...")
         
-        # Gửi message với files và user_id
-        response = await agent_client.send_message(message, None, files, user_id)
+        # Kiểm tra agent health trước khi gửi
+        if not agent_client.is_healthy:
+            logger.warning(f"⚠️ {agent_name} không healthy, đang thử health check...")
+            is_healthy = await agent_client.health_check()
+            if not is_healthy:
+                logger.error(f"❌ {agent_name} tại {agent_client.base_url} không khả dụng")
+                raise Exception(f"{agent_name} tại {agent_client.base_url} không khả dụng. Vui lòng thử lại sau.")
         
-        # Lưu vào chat history
-        if session_id:
-            # Tạo message content bao gồm thông tin về files
-            message_content = message
-            if files:
-                file_names = [f.name for f in files]
-                message_content += f" [Đính kèm: {', '.join(file_names)}]"
+        try:
+            # Gửi message với files và user_id
+            start_time = time.time()
+            response = await agent_client.send_message(message, None, files, user_id)
+            total_time = time.time() - start_time
             
-            if user_id and self.redis_client:
-                # Sử dụng Redis
-                chat_history = await self._ensure_chat_history_with_redis(user_id, session_id)
-                chat_history.add_message("assistant", response.get("text", ""), agent_name)
-                await self._save_chat_history_to_redis(user_id, session_id, chat_history)
-            else:
-                # Fallback to in-memory
-                self._ensure_chat_history(session_id)
-                self.chat_histories[session_id].add_message("assistant", response.get("text", ""), agent_name)
-        
-        return response
+            logger.info(f"📥 Manager nhận response từ {agent_name} trong {total_time:.2f}s")
+            
+            # Lưu vào chat history
+            if session_id:
+                # Tạo message content bao gồm thông tin về files
+                message_content = message
+                if files:
+                    file_names = [f.name for f in files if hasattr(f, 'name')]
+                    message_content += f" [Đính kèm: {', '.join(file_names)}]"
+                
+                try:
+                    if user_id and self.redis_client:
+                        # Sử dụng Redis
+                        chat_history = await self._ensure_chat_history_with_redis(user_id, session_id)
+                        chat_history.add_message("assistant", response.get("text", ""), agent_name)
+                        await self._save_chat_history_to_redis(user_id, session_id, chat_history)
+                        logger.debug(f"💾 Lưu response vào Redis cho session {session_id}")
+                    else:
+                        # Fallback to in-memory
+                        self._ensure_chat_history(session_id)
+                        self.chat_histories[session_id].add_message("assistant", response.get("text", ""), agent_name)
+                        logger.debug(f"💾 Lưu response vào memory cho session {session_id}")
+                except Exception as e:
+                    logger.error(f"❌ Lỗi khi lưu chat history cho session {session_id}: {e}")
+                    # Không raise exception để không ảnh hưởng tới response
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"❌ Manager failed khi gửi message tới {agent_name} tại {agent_client.base_url}: {str(e)}")
+            # Mark agent as unhealthy
+            agent_client.is_healthy = False
+            raise
 
     def _ensure_chat_history(self, session_id: str):
         """Đảm bảo chat history tồn tại cho session"""
@@ -444,31 +565,68 @@ class A2AClientManager:
             return self.chat_histories[session_id]
 
     async def get_available_agents(self) -> List[str]:
-        """Lấy danh sách agents khả dụng"""
+        """Lấy danh sách agents khả dụng với real-time health check"""
         available = []
+        total_agents = len(self.agents)
+        
+        logger.debug(f"🔍 Kiểm tra tính khả dụng của {total_agents} agents...")
+        
         for agent_name, agent_client in self.agents.items():
             if agent_client.is_healthy:
                 available.append(agent_name)
+                logger.debug(f"✅ {agent_name} đã healthy")
             else:
                 # Thử health check lần nữa
+                logger.debug(f"🔄 {agent_name} không healthy, đang thử kiểm tra lại tại {agent_client.base_url}")
                 is_healthy = await agent_client.health_check()
                 if is_healthy:
                     available.append(agent_name)
+                    logger.info(f"🔄 {agent_name} tại {agent_client.base_url} đã khôi phục")
+                else:
+                    logger.warning(f"❌ {agent_name} tại {agent_client.base_url} vẫn không khả dụng")
+        
+        logger.info(f"📊 Agents khả dụng: {len(available)}/{total_agents} - {available}")
+        
+        if not available:
+            logger.error("❌ Không có agent nào khả dụng! Tất cả agents đều down.")
         
         return available
 
     async def health_check_all(self) -> Dict[str, Any]:
-        """Health check tất cả agents"""
+        """Health check tất cả agents với logging chi tiết"""
         results = {}
+        healthy_count = 0
+        total_count = len(self.agents)
+        
+        logger.info(f"🏥 Bắt đầu health check cho {total_count} agents...")
         
         for agent_name, agent_client in self.agents.items():
+            logger.debug(f"🔍 Kiểm tra {agent_name} tại {agent_client.base_url}")
+            
+            start_time = time.time()
             is_healthy = await agent_client.health_check()
+            check_time = time.time() - start_time
+            
+            if is_healthy:
+                healthy_count += 1
+                logger.info(f"✅ {agent_name} healthy tại {agent_client.base_url} ({check_time:.2f}s)")
+            else:
+                logger.warning(f"❌ {agent_name} unhealthy tại {agent_client.base_url} ({check_time:.2f}s)")
+            
             results[agent_name] = {
                 "healthy": is_healthy,
                 "url": agent_client.base_url,
                 "initialized": agent_client.is_initialized,
-                "last_check": agent_client.last_health_check.isoformat() if agent_client.last_health_check else None
+                "last_check": agent_client.last_health_check.isoformat() if agent_client.last_health_check else None,
+                "response_time": round(check_time, 2)
             }
+        
+        logger.info(f"🏥 Health check hoàn tất: {healthy_count}/{total_count} agents healthy")
+        
+        if healthy_count == 0:
+            logger.error("❌ Không có agent nào healthy! Hệ thống có thể gặp vấn đề nghiêm trọng.")
+        elif healthy_count < total_count:
+            logger.warning(f"⚠️ Chỉ {healthy_count}/{total_count} agents healthy. Một số tính năng có thể bị ảnh hưởng.")
         
         return results
 

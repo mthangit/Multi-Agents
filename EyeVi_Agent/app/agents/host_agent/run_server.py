@@ -25,7 +25,7 @@ def main():
     try:
         # Lấy config từ environment variables
         host = os.getenv("HOST", "0.0.0.0")
-        port = int(os.getenv("PORT", "8080"))
+        port = int(os.getenv("PORT", "8000"))
         reload = os.getenv("RELOAD", "true").lower() == "true"
         
         logger.info("🚀 Đang khởi động Host Agent Server...")
