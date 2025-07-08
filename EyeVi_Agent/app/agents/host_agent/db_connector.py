@@ -281,6 +281,13 @@ class DatabaseConnector:
                 cursor.execute(query)
                 orders = cursor.fetchall()
                 
+                # Convert datetime objects to strings
+                for order in orders:
+                    if order.get('created_at'):
+                        order['created_at'] = order['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    if order.get('updated_at'):
+                        order['updated_at'] = order['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+                
                 return orders
                 
         except Exception as e:
@@ -304,6 +311,13 @@ class DatabaseConnector:
                 """
                 cursor.execute(query, (user_id,))
                 orders = cursor.fetchall()
+                
+                # Convert datetime objects to strings
+                for order in orders:
+                    if order.get('created_at'):
+                        order['created_at'] = order['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    if order.get('updated_at'):
+                        order['updated_at'] = order['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
                 
                 return orders
                 
@@ -332,6 +346,12 @@ class DatabaseConnector:
                 if not order:
                     return None
                 
+                # Convert datetime objects to strings for order
+                if order.get('created_at'):
+                    order['created_at'] = order['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                if order.get('updated_at'):
+                    order['updated_at'] = order['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+                
                 # Lấy chi tiết sản phẩm trong đơn hàng
                 details_query = """
                 SELECT od.id, od.order_id, od.product_id, od.quantity, od.price,
@@ -345,8 +365,15 @@ class DatabaseConnector:
                 cursor.execute(details_query, (order_id,))
                 details = cursor.fetchall()
                 
-                # Xử lý images cho từng sản phẩm trong order details
+                # Xử lý images và datetime cho từng sản phẩm trong order details
                 for detail in details:
+                    # Convert datetime objects to strings
+                    if detail.get('created_at'):
+                        detail['created_at'] = detail['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    if detail.get('updated_at'):
+                        detail['updated_at'] = detail['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+                    
+                    # Process product images
                     if detail.get('product_images'):
                         try:
                             import json
