@@ -25,7 +25,9 @@ export const ALL_USER = `${baseUrl}/admin/getUser`;
 export const ALL_INVOICE = `${baseUrl}/admin/getInvoices`;
 
 // Orders URL - từ host agent (không cần xác thực)
-const hostAgentUrl = "http://eyevi.devsecopstech.click:8000";
 export const ORDERS_URL = `${baseUrl}/orders`;
 export const USER_ORDERS_URL = `${baseUrl}/orders/user`;
 export const ORDER_DETAILS_URL = `${baseUrl}/orders`;
+
+// Product details từ backend chính
+export const WEB_PRODUCT_DETAILS_URL = `${baseUrl}/web-product`;

@@ -9,7 +9,7 @@ import {
   useProductsContext,
   useWishlistContext,
 } from "../contexts";
-import { getProductByIdService } from "../api/apiServices";
+import { getProductByIdService, getWebProductDetailsService } from "../api/apiServices";
 import { StarRating, Similar } from "../components";
 import { notify } from "../utils/utils";
 
@@ -31,23 +31,84 @@ const ProductDetails = () => {
   const { addProductToWishlist, deleteProductFromWishlist, disableWish } =
     useWishlistContext();
   const [loading, setLoading] = useState(false);
-  const product = getProductById(parsedProductId);
-
-  // Sử dụng image_url nếu có, fallback sang image
-  const productImage = product?.image_url || product?.image;
+  const [productDetails, setProductDetails] = useState(null);
+  const [error, setError] = useState(null);
+  
+  // Fallback sản phẩm từ context (nếu có)
+  const localProduct = getProductById(parsedProductId);
 
   useEffect(() => {
-    (async () => {
+    const fetchProductDetails = async () => {
       setLoading(true);
+      setError(null);
+      
       try {
-        const response = await getProductByIdService(productId);
-      } catch (err) {
-        console.log(err);
+        // Thử lấy từ API backend chính trước
+        console.log("🔍 Đang lấy chi tiết sản phẩm từ API backend...");
+        const response = await getWebProductDetailsService(productId);
+        
+        if (response.status === 200 && response.data) {
+          setProductDetails(response.data);
+          console.log("✅ Đã lấy chi tiết sản phẩm từ backend API:", response.data);
+        } else {
+          throw new Error("Không có dữ liệu sản phẩm");
+        }
+      } catch (apiError) {
+        console.warn("⚠️ Lỗi API backend, fallback to local:", apiError.message);
+        
+        // Nếu có local product, sử dụng nó
+        if (localProduct) {
+          setProductDetails(localProduct);
+          console.log("✅ Sử dụng sản phẩm từ local context");
+        } else {
+          // Không có local product, báo lỗi
+          setError("Không tìm thấy sản phẩm");
+          console.error("❌ Không tìm thấy sản phẩm nào");
+        }
       } finally {
         setLoading(false);
       }
-    })();
-  }, [allProducts]);
+    };
+
+    fetchProductDetails();
+  }, [productId, localProduct]);
+
+  // Sử dụng productDetails từ API hoặc fallback local product
+  const product = productDetails;
+
+  // Sử dụng image_url nếu có, fallback sang image
+  const productImage = product?.image_url || product?.images?.[0] || product?.image;
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-[60vh] flex justify-center items-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Đang tải chi tiết sản phẩm...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !product) {
+    return (
+      <div className="min-h-[60vh] flex justify-center items-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4">😕</div>
+          <h2 className="text-2xl font-bold text-gray-800 mb-2">Không tìm thấy sản phẩm</h2>
+          <p className="text-gray-600 mb-4">{error || "Sản phẩm bạn tìm không tồn tại hoặc đã bị xóa"}</p>
+          <button
+            onClick={() => navigate("/")}
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Về trang chủ
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>

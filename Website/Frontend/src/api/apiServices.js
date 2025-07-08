@@ -13,6 +13,7 @@ import {
   ORDERS_URL,
   USER_ORDERS_URL,
   ORDER_DETAILS_URL,
+  WEB_PRODUCT_DETAILS_URL,
 } from "./apiUrls";
 
 export const loginService = (email, password) =>
@@ -45,6 +46,10 @@ export const getProductsPaginatedService = (page = 1, limit = 20, search = "", c
 export const getProductByIdService = (productId) =>
   //axios.get(`http://34.87.90.190:8000/api/products/${productId}`);
   axios.get(`${PRODUCTS_URL}/${productId}`);
+
+// Lấy chi tiết sản phẩm từ backend chính
+export const getWebProductDetailsService = (productId) =>
+  axios.get(`${WEB_PRODUCT_DETAILS_URL}/${productId}`);
 
 // export const getCartItemsService = (token) =>
 //   axios.get(`${CART_URL}/get`, {
