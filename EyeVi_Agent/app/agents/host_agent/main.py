@@ -4,6 +4,7 @@ Orchestrator agent để điều phối message tới các agent khác
 """
 
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import asyncio
@@ -31,6 +32,15 @@ app = FastAPI(
     title="Host Agent API",
     description="Orchestrator agent để điều phối message tới các agent khác",
     version="1.0.0"
+)
+
+# Thêm CORS middleware để cho phép tất cả domain truy cập
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Cho phép tất cả domain
+    allow_credentials=True,
+    allow_methods=["*"],  # Cho phép tất cả HTTP methods
+    allow_headers=["*"],  # Cho phép tất cả headers
 )
 
 # Khởi tạo host server
