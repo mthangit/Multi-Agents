@@ -17,7 +17,8 @@ from server.host_server import HostServer
 from server.a2a_client_manager import FileInfo
 from db_connector import db_connector
 
-
+from uuid import uuid4
+from sqlalchemy import text
 import dotenv
 dotenv.load_dotenv()
 
@@ -118,7 +119,6 @@ async def chat(
         
         # Tự động tạo session ID nếu không có
         if not session_id:
-            from uuid import uuid4
             session_id = str(uuid4())
             logger.info(f"🆔 Tạo session ID mới: {session_id}")
         
@@ -250,13 +250,12 @@ async def get_agents_status():
 
 @app.get("/sessions/{session_id}/history")
 async def get_chat_history(session_id: str, user_id: Optional[str] = None):
-    """Lấy lịch sử chat cho session"""
+    """Lấy lịch sử chat cho session từ MySQL, sắp xếp mới nhất trước"""
     try:
-        if user_id:
-            messages = await host_server.get_chat_history(user_id, session_id)
-        else:
-            messages = host_server.get_chat_history_fallback(session_id)
-        
+        # Lấy 50 tin nhắn mới nhất từ MySQL
+        messages = await host_server.mysql_history.get_session_messages(session_id, limit=50, offset=0)
+        # Sắp xếp giảm dần theo created_at (mới nhất trước)
+        messages = sorted(messages, key=lambda x: x["created_at"], reverse=True)
         if not messages:
             return {
                 "status": "success",
@@ -264,23 +263,19 @@ async def get_chat_history(session_id: str, user_id: Optional[str] = None):
                 "user_id": user_id,
                 "messages": [],
                 "message": "Không có lịch sử chat cho session này",
-                "total_messages": 0
+                "total_messages": 0,
+                "returned_messages": 0
             }
-        
-        # Lấy 50 tin nhắn gần đây nhất
-        recent_messages = messages[-50:] if len(messages) > 50 else messages
-        
         return {
             "status": "success",
             "session_id": session_id,
             "user_id": user_id,
-            "messages": recent_messages,
+            "messages": messages,
             "total_messages": len(messages),
-            "returned_messages": len(recent_messages)
+            "returned_messages": len(messages)
         }
-        
     except Exception as e:
-        logger.error(f"Failed to get chat history for session {session_id}: {e}")
+        logger.error(f"Failed to get chat history for session {session_id} from MySQL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/sessions/{session_id}/history")
@@ -305,27 +300,27 @@ async def clear_chat_history(session_id: str, user_id: Optional[str] = None):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/sessions/create")
-async def create_new_session():
-    """Tạo session ID mới"""
+async def create_new_session(user_id: str = Form(...)):
+    """Tạo session ID mới và lưu vào bảng sessions"""
     try:
-        # Import uuid để tạo session ID
-        from uuid import uuid4
-        
-        # Tạo session ID mới
         new_session_id = str(uuid4())
-        
-        # Khởi tạo chat history cho session mới
+        now = datetime.now()
+        ok = await host_server.mysql_history.save_session(
+            session_id=new_session_id,
+            user_id=int(user_id),
+            created_at=now,
+            updated_at=now
+        )
+        if not ok:
+            raise Exception("Lỗi khi lưu session vào MySQL")
         host_server.a2a_client_manager._ensure_chat_history(new_session_id)
-        
-        logger.info(f"✅ Đã tạo session mới: {new_session_id}")
-        
+        logger.info(f"✅ Đã tạo session mới: {new_session_id} cho user {user_id}")
         return {
             "status": "success",
             "session_id": new_session_id,
             "message": "Session mới đã được tạo thành công",
-            "timestamp": datetime.now().isoformat()
+            "timestamp": now.isoformat()
         }
-        
     except Exception as e:
         logger.error(f"Failed to create new session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -359,30 +354,69 @@ async def list_active_sessions():
 
 @app.get("/users/{user_id}/sessions")
 async def get_user_sessions(user_id: str):
-    """Lấy danh sách tất cả sessions của user"""
+    """Lấy danh sách tất cả sessions của user từ MySQL (bao gồm cả session chưa có message)"""
     try:
-        sessions = await host_server.get_user_sessions(user_id)
-        
-        # Lấy thông tin chi tiết cho từng session
-        sessions_info = []
-        for session_id in sessions:
-            try:
-                chat_history = await host_server.get_chat_history(user_id, session_id)
-                if chat_history:
+        mysql_user_id = int(user_id)
+        # Lấy tất cả session_id của user từ bảng sessions
+        session_query = text("""
+            SELECT session_id, created_at, updated_at
+            FROM sessions
+            WHERE user_id = :user_id
+        """)
+        async with host_server.mysql_history.async_session() as session:
+            session_result = await session.execute(session_query, {"user_id": mysql_user_id})
+            session_rows = session_result.fetchall()
+            if not session_rows:
+                return {
+                    "status": "success",
+                    "user_id": user_id,
+                    "total_sessions": 0,
+                    "sessions": [],
+                    "timestamp": datetime.now().isoformat()
+                }
+            session_ids = [row.session_id for row in session_rows]
+            # Lấy thông tin message cho các session này
+            if session_ids:
+                msg_query = text(f'''
+                    SELECT
+                        session_id,
+                        MIN(created_at) AS created_at,
+                        MAX(created_at) AS last_updated,
+                        COUNT(*) AS message_count,
+                        (
+                            SELECT message_content FROM message_history m2
+                            WHERE m2.session_id = m1.session_id
+                            ORDER BY created_at DESC LIMIT 1
+                        ) AS last_message_preview
+                    FROM message_history m1
+                    WHERE session_id IN :session_ids
+                    GROUP BY session_id
+                    ORDER BY created_at DESC
+                ''')
+                msg_result = await session.execute(msg_query, {"session_ids": tuple(session_ids)})
+                msg_map = {row.session_id: row for row in msg_result.fetchall()}
+            else:
+                msg_map = {}
+            # Tổng hợp kết quả
+            sessions_info = []
+            for row in session_rows:
+                msg = msg_map.get(row.session_id)
+                if msg:
                     sessions_info.append({
-                        "session_id": session_id,
-                        "created_at": chat_history.created_at.isoformat(),
-                        "last_updated": chat_history.last_updated.isoformat(),
-                        "message_count": len(chat_history.messages),
-                        "last_message_preview": chat_history.messages[-1]["content"][:100] + "..." if chat_history.messages else ""
+                        "session_id": row.session_id,
+                        "created_at": row.created_at.isoformat() if row.created_at else None,
+                        "last_updated": msg.last_updated.isoformat() if msg.last_updated else (row.updated_at.isoformat() if row.updated_at else None),
+                        "message_count": msg.message_count,
+                        "last_message_preview": (msg.last_message_preview[:100] + ("..." if msg.last_message_preview and len(msg.last_message_preview) > 100 else "")) if msg.last_message_preview else ""
                     })
-            except Exception as e:
-                logger.warning(f"Cannot get details for session {session_id}: {e}")
-                sessions_info.append({
-                    "session_id": session_id,
-                    "error": "Cannot retrieve details"
-                })
-        
+                else:
+                    sessions_info.append({
+                        "session_id": row.session_id,
+                        "created_at": row.created_at.isoformat() if row.created_at else None,
+                        "last_updated": row.updated_at.isoformat() if row.updated_at else None,
+                        "message_count": 0,
+                        "last_message_preview": ""
+                    })
         return {
             "status": "success",
             "user_id": user_id,
@@ -390,9 +424,8 @@ async def get_user_sessions(user_id: str):
             "sessions": sessions_info,
             "timestamp": datetime.now().isoformat()
         }
-        
     except Exception as e:
-        logger.error(f"Failed to get user sessions for {user_id}: {e}")
+        logger.error(f"Failed to get user sessions for {user_id} from MySQL: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

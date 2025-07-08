@@ -222,6 +222,50 @@ class MySQLMessageHistory:
             metadata=metadata
         )
     
+    async def save_session(
+        self,
+        session_id: str,
+        user_id: int,
+        created_at: Optional[datetime] = None,
+        updated_at: Optional[datetime] = None
+    ) -> bool:
+        """
+        Lưu session mới vào bảng sessions
+        Args:
+            session_id: ID của session
+            user_id: ID của user
+            created_at: thời gian tạo (nếu không truyền sẽ lấy now)
+            updated_at: thời gian cập nhật (nếu không truyền sẽ lấy now)
+        Returns:
+            True nếu thành công, False nếu lỗi
+        """
+        if not self.async_session:
+            logger.error("❌ MySQL not initialized")
+            return False
+        try:
+            from datetime import datetime
+            now = datetime.now()
+            insert_query = text("""
+                INSERT INTO sessions (session_id, user_id, created_at, updated_at)
+                VALUES (:session_id, :user_id, :created_at, :updated_at)
+            """)
+            async with self.async_session() as session:
+                await session.execute(
+                    insert_query,
+                    {
+                        "session_id": session_id,
+                        "user_id": user_id,
+                        "created_at": created_at or now,
+                        "updated_at": updated_at or now
+                    }
+                )
+                await session.commit()
+            logger.debug(f"💾 Đã lưu session vào MySQL: session_id={session_id}, user_id={user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to save session to MySQL: {e}")
+            return False
+    
     async def get_session_messages(
         self,
         session_id: str,
@@ -241,7 +285,7 @@ class MySQLMessageHistory:
                     message_content, metadata, created_at
                 FROM message_history 
                 WHERE session_id = :session_id
-                ORDER BY created_at ASC
+                ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
             """)
             
@@ -284,10 +328,10 @@ class MySQLMessageHistory:
         
         try:
             query = text("""
-                SELECT DISTINCT session_id
+                SELECT DISTINCT session_id, created_at
                 FROM message_history 
                 WHERE user_id = :user_id
-                ORDER BY MAX(created_at) DESC
+                ORDER BY (created_at) DESC
                 LIMIT :limit
             """)
             
