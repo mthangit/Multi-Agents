@@ -121,8 +121,11 @@ class DatabaseConnector:
                 cursor.execute(query)
                 products = cursor.fetchall()
                 
-                # Xử lý trường images cho mỗi sản phẩm
+                # Xử lý trường images cho mỗi sản phẩm và chuyển id thành _id
                 for product in products:
+                    # Chuyển id thành _id để tương thích với frontend
+                    product['_id'] = product.pop('id')
+                    
                     if product.get('images'):
                         try:
                             import json
@@ -204,8 +207,11 @@ class DatabaseConnector:
                 cursor.execute(products_query, params + [limit, offset])
                 products = cursor.fetchall()
                 
-                # Xử lý trường images cho mỗi sản phẩm
+                # Xử lý trường images cho mỗi sản phẩm và chuyển id thành _id
                 for product in products:
+                    # Chuyển id thành _id để tương thích với frontend
+                    product['_id'] = product.pop('id')
+                    
                     if product.get('images'):
                         try:
                             import json
