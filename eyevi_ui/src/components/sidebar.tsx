@@ -6,23 +6,24 @@ import { Button } from "./ui/button";
 import Link from "next/link";
 import { useChatApi, FIXED_USER_ID } from "@/hooks/useChatApi";
 import ThemeToggle from "./theme-toggle";
+import { cn } from "@/lib/utils";
 
 interface SessionInfo {
-  id: string;
-  title?: string;
-  created_at?: string;
-  last_updated?: string;
-  message_count?: number;
-  last_message_preview?: string;
+  session_id: string;
+  created_at: string;
+  last_updated: string;
+  message_count: number;
+  last_message_preview: string;
 }
 
 interface SidebarProps {
   sessionId?: string | null;
   onNewChat?: () => void;
   onClearHistory?: () => void;
+  onLoadHistory?: (sessionId: string) => void;
 }
 
-const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
+const Sidebar = ({ sessionId, onNewChat, onClearHistory, onLoadHistory }: SidebarProps) => {
   const [activeSessions, setActiveSessions] = useState<SessionInfo[]>([]);
   const [isCreatingSession, setIsCreatingSession] = useState(false);
   const { clearChatHistory } = useChatApi();
@@ -34,7 +35,9 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
         const response = await fetch(`/api/users/${FIXED_USER_ID}/sessions`);
         if (response.ok) {
           const data = await response.json();
-          setActiveSessions(data.sessions || []);
+          if (data.status === "success") {
+            setActiveSessions(data.sessions || []);
+          }
         }
       } catch (error) {
         console.error("Lỗi khi lấy danh sách phiên:", error);
@@ -81,45 +84,48 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
       </div>
 
       {/* New Chat Button */}
-      <Button 
-        className="relative flex items-center gap-3 mb-4 px-4 py-3 bg-gradient-to-r from-sidebar-primary to-sidebar-primary/90 text-sidebar-primary-foreground hover:from-sidebar-primary/90 hover:to-sidebar-primary/80 transition-all duration-300 active:scale-[0.98] hover:scale-[1.02] hover:shadow-lg rounded-xl border border-sidebar-primary/20 overflow-hidden"
+      <Button
+        className="flex items-center gap-3 mb-4 px-4 py-3 bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200 rounded-lg border"
         onClick={handleNewChat}
         disabled={isCreatingSession}
       >
-        {/* Background gradient effect */}
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent translate-x-[-100%] hover:translate-x-[100%] transition-transform duration-700" />
-        
-        <div className="relative z-10 flex items-center gap-3">
-          {isCreatingSession ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Plus className="w-4 h-4 transition-all duration-300 group-hover:rotate-90" />
-          )}
-          <span className="font-medium">
-            {isCreatingSession ? "Đang tạo..." : "Tạo cuộc trò chuyện mới"}
-          </span>
-        </div>
+        {isCreatingSession ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          <Plus className="w-4 h-4" />
+        )}
+        <span className="font-medium">
+          {isCreatingSession ? "Đang tạo..." : "Tạo cuộc trò chuyện mới"}
+        </span>
       </Button>
 
       {/* Chat History */}
       <div className="flex-1 overflow-y-auto mb-4">
         <div className="text-sm font-medium mb-2 px-2">Gần đây</div>
         <div className="space-y-1">
-          {activeSessions.length > 0 ? (
-            activeSessions.map((session, index) => (
-              <ChatHistoryItem 
-                key={session.id || `session-${index}`}
-                title={session.id || `Cuộc hội thoại ${session.id}`} 
-                active={session.id === sessionId} 
-                messageCount={session.message_count}
-                preview={session.last_message_preview}
-              />
-            ))
-          ) : (
-            <div className="text-sm text-muted-foreground px-3 py-2">
-              Chưa có cuộc trò chuyện nào
-            </div>
-          )}
+          {(() => {
+            // Lọc ra các session có message_count > 0
+            const validSessions = activeSessions.filter((session) => session.message_count > 0);
+
+            return validSessions.length > 0 ? (
+              // Sắp xếp theo thời gian cập nhật mới nhất lên đầu
+              validSessions
+                .sort((a, b) => new Date(b.last_updated).getTime() - new Date(a.last_updated).getTime())
+                .map((session) => (
+                  <ChatHistoryItem
+                    key={session.session_id}
+                    title={session.last_message_preview || `New Chat`}
+                    active={session.session_id === sessionId}
+                    timestamp={session.last_updated}
+                    onClick={() => onLoadHistory?.(session.session_id)}
+                  />
+                ))
+            ) : (
+              <div className="text-sm text-muted-foreground px-3 py-2">
+                Chưa có cuộc trò chuyện nào
+              </div>
+            );
+          })()}
           
           {/* Fallback nếu không có session từ API */}
           {activeSessions.length === 0 && sessionId && (
@@ -134,13 +140,21 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
 
       {/* Footer */}
       <div className="mt-auto border-t border-sidebar-border pt-4 space-y-2">
-        <FooterItem icon={<Globe size={16} />} text="Trang web" onClick={() => { /* TODO: tích hợp link sau */ }} />
+        <FooterItem
+          icon={<Globe size={16} />}
+          text="Trang web"
+          onClick={() => {
+            const shopUrl = process.env.NEXT_PUBLIC_SHOP_DOMAIN;
+            if (shopUrl) {
+              window.open(shopUrl, '_blank');
+            }
+          }}
+        />
         <FooterItem 
           icon={<Trash2 size={16} />} 
           text="Xóa lịch sử" 
           onClick={handleClearHistory}
         />
-        <FooterItem icon={<Paperclip size={16} />} text="Đính kèm tệp" />
       </div>
     </div>
   );
@@ -149,32 +163,59 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory }: SidebarProps) => {
 // Chat history item component
 interface ChatHistoryItemProps {
   title: string;
-  active: boolean;
-  messageCount?: number;
+  active?: boolean;
   preview?: string;
+  timestamp?: string;
+  onClick?: () => void;
 }
 
-const ChatHistoryItem = ({ title, active, messageCount, preview }: ChatHistoryItemProps) => {
+const ChatHistoryItem = ({ title, active, timestamp, onClick }: ChatHistoryItemProps) => {
+  // Format thời gian hiển thị
+  const formatTimestamp = (timestamp?: string) => {
+    if (!timestamp) return "";
+
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      // Nếu trong vòng 24h, hiển thị giờ:phút
+      return date.toLocaleTimeString('vi-VN', {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } else if (diffInHours < 24 * 7) {
+      // Nếu trong vòng 1 tuần, hiển thị thứ
+      return date.toLocaleDateString('vi-VN', {
+        weekday: 'short'
+      });
+    } else {
+      // Nếu lâu hơn, hiển thị ngày/tháng
+      return date.toLocaleDateString('vi-VN', {
+        day: '2-digit',
+        month: '2-digit'
+      });
+    }
+  };
+
   return (
     <button
-      className={`w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-        active
-          ? "bg-sidebar-primary text-sidebar-primary-foreground"
-          : "hover:bg-sidebar-accent/50 text-sidebar-foreground"
-      }`}
+      className={cn(
+        "w-full text-left px-3 py-2 rounded-lg transition-colors duration-200",
+        "hover:bg-accent/50",
+        active ? "bg-accent" : "bg-transparent"
+      )}
+      onClick={onClick}
     >
       <div className="flex flex-col">
-        <span>{title}</span>
-        {preview && (
-          <span className="text-xs text-muted-foreground truncate mt-1">
-            {preview}
-          </span>
-        )}
-        {messageCount && (
-          <span className="text-xs text-muted-foreground mt-0.5">
-            {messageCount} tin nhắn
-          </span>
-        )}
+        <div className="flex items-center justify-between">
+          <span className="font-medium truncate text-sm">{title}</span>
+          {timestamp && (
+            <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
+              {formatTimestamp(timestamp)}
+            </span>
+          )}
+        </div>
       </div>
     </button>
   );

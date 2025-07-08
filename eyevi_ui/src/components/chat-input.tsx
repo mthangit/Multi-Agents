@@ -8,6 +8,7 @@ import { Textarea } from "./ui/textarea";
 interface ChatInputProps {
   onSendMessage: (message: string, attachments?: File[]) => void;
   isLoading?: boolean;
+  disabled?: boolean;
 }
 
 // Tạo ref type để export
@@ -16,7 +17,7 @@ export interface ChatInputRef {
   focusInput: () => void;
 }
 
-const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isLoading = false }, ref) => {
+const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isLoading = false, disabled = false }, ref) => {
   const [message, setMessage] = useState("");
   const [attachments, setAttachments] = useState<File[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -42,11 +43,11 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if ((message.trim() || attachments.length > 0) && !isLoading) {
+    if ((message.trim() || attachments.length > 0) && !isLoading && !disabled) {
       onSendMessage(message, attachments);
       setMessage("");
       setAttachments([]);
-      
+
       // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
@@ -55,7 +56,7 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey && !isLoading) {
+    if (e.key === "Enter" && !e.shiftKey && !isLoading && !disabled) {
       e.preventDefault();
       handleSubmit(e);
     }
@@ -72,13 +73,13 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
   };
 
   const handleAttachFile = () => {
-    if (!isLoading) {
+    if (!isLoading && !disabled) {
       fileInputRef.current?.click();
     }
   };
 
   const handleUploadImage = () => {
-    if (!isLoading) {
+    if (!isLoading && !disabled) {
       imageInputRef.current?.click();
     }
   };
@@ -98,43 +99,43 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
     <div className="border-t border-border p-4">
       <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
         <div className="flex items-center gap-2 mb-2">
-          <Button 
-            type="button" 
-            size="icon" 
-            variant="outline" 
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
             aria-label="Đính kèm tệp"
             onClick={handleAttachFile}
-            disabled={isLoading}
+            disabled={isLoading || disabled}
           >
             <Paperclip className="h-4 w-4" />
           </Button>
-          <input 
-            type="file" 
-            ref={fileInputRef} 
-            className="hidden" 
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
             onChange={handleFileChange}
             multiple
-            disabled={isLoading}
+            disabled={isLoading || disabled}
           />
           
-          <Button 
-            type="button" 
-            size="icon" 
-            variant="outline" 
+          <Button
+            type="button"
+            size="icon"
+            variant="outline"
             aria-label="Tải ảnh lên"
             onClick={handleUploadImage}
-            disabled={isLoading}
+            disabled={isLoading || disabled}
           >
             <ImageIcon className="h-4 w-4" />
           </Button>
-          <input 
-            type="file" 
-            ref={imageInputRef} 
-            className="hidden" 
+          <input
+            type="file"
+            ref={imageInputRef}
+            className="hidden"
             onChange={handleFileChange}
             accept="image/*"
             multiple
-            disabled={isLoading}
+            disabled={isLoading || disabled}
           />
         </div>
         
@@ -164,15 +165,15 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
             value={message}
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
-            placeholder="Nhập tin nhắn của bạn..."
+            placeholder={disabled ? "Chế độ xem lịch sử - không thể chat" : "Nhập tin nhắn của bạn..."}
             className="min-h-[60px] max-h-[200px] resize-none"
-            disabled={isLoading}
+            disabled={isLoading || disabled}
           />
-          <Button 
-            type="submit" 
-            size="icon" 
+          <Button
+            type="submit"
+            size="icon"
             className="bg-sidebar-primary text-sidebar-primary-foreground hover:bg-sidebar-primary/90"
-            disabled={(!message.trim() && attachments.length === 0) || isLoading}
+            disabled={(!message.trim() && attachments.length === 0) || isLoading || disabled}
           >
             {isLoading ? (
               <div className="h-4 w-4 animate-spin rounded-full border-2 border-t-transparent" />

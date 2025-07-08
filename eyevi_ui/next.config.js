@@ -19,6 +19,15 @@ const nextConfig = {
       },
     ],
   },
+  // Cấu hình timeout cho server
+  experimental: {
+    proxyTimeout: 300000, // 5 phút (300 giây) cho proxy timeout
+  },
+  // Cấu hình server timeout
+  serverRuntimeConfig: {
+    // Timeout cho API routes (milliseconds)
+    apiTimeout: 300000, // 5 phút
+  },
   async rewrites() {
     return [
       {

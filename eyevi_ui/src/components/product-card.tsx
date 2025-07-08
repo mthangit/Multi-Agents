@@ -17,6 +17,27 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct, prod
   const [error, setError] = useState<string | null>(null);
   const { getProductById } = useChatApi();
   const { setChatInputMessage } = useChatContext();
+
+  // Function để format giá tiền, handle cả decimal và string
+  const formatPrice = (product: ProductData): string => {
+    // Ưu tiên newPrice (decimal/number) trước
+    if (product.newPrice !== undefined && product.newPrice !== null) {
+      const price = typeof product.newPrice === 'string' ? parseFloat(product.newPrice) : product.newPrice;
+      if (!isNaN(price) && price > 0) {
+        return `${Math.round(price).toLocaleString('vi-VN')}₫`;
+      }
+    }
+
+    // Fallback về price (string)
+    if (product.price) {
+      const price = parseFloat(product.price);
+      if (!isNaN(price) && price > 0) {
+        return `${Math.round(price).toLocaleString('vi-VN')}₫`;
+      }
+    }
+
+    return "Liên hệ";
+  };
   
   // Sử dụng useRef để theo dõi việc đã fetch dữ liệu hay chưa
   const hasFetchedRef = useRef<boolean>(false);
@@ -45,7 +66,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct, prod
           const formattedData: ProductData = {
             ...data,
             product_id: data.id,
-            price: data.newPrice ? data.newPrice.toString() : undefined,
+            price: data.price ? data.price.toString() : undefined,
+            newPrice: data.newPrice, // Giữ nguyên kiểu decimal/number
             image_url: data.image_url || (data.images ? JSON.parse(data.images)[0] : undefined)
           };
           setProduct(formattedData);
@@ -109,7 +131,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct, prod
             return {
               ...prev,
               name: data.name || prev.name,
-              price: data.newPrice ? (data.newPrice).toString() : prev.price,
+              price: data.price ? data.price.toString() : prev.price,
+              newPrice: data.newPrice || prev.newPrice, // Giữ nguyên kiểu decimal/number
               image_url: imageUrl || prev.image_url
             };
           });
@@ -131,6 +154,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct, prod
       const productId = product.product_id;
       const productName = product.name || "Sản phẩm kính mắt";
       setChatInputMessage(`Tôi muốn mua sản phẩm ${productName} với id ${productId}`);
+    }
+  };
+
+  // Xử lý sự kiện khi click vào nút Chi tiết
+  const handleViewDetails = () => {
+    if (product) {
+      const shopDomain = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'https://eyevishop.onrender.com';
+      const detailUrl = `${shopDomain}/product/${product.product_id}`;
+      window.open(detailUrl, '_blank', 'noopener,noreferrer');
     }
   };
   
@@ -220,18 +252,31 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct, prod
           )}
         </div>
         
-        <div className="mt-2 flex items-center justify-between">
-          <span className="font-medium text-primary">
-            {product.price ? `${parseInt(product.price).toLocaleString('vi-VN')}₫` : "Liên hệ"}
-          </span>
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="text-xs h-7"
-            onClick={handleBuyProduct}
-          >
-            Mua hàng
-          </Button>
+        <div className="mt-2 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-medium text-primary">
+              {formatPrice(product)}
+            </span>
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-7 flex-1"
+              onClick={handleViewDetails}
+            >
+              Chi tiết
+            </Button>
+            <Button
+              size="sm"
+              variant="default"
+              className="text-xs h-7 flex-1"
+              onClick={handleBuyProduct}
+            >
+              Mua hàng
+            </Button>
+          </div>
         </div>
       </div>
     </div>

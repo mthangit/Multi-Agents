@@ -45,17 +45,17 @@ export interface ProductData {
   brand?: string;
   category?: string;
   color?: string;
-  price?: string;
+  price?: string;           // Giá dạng string (legacy)
   description?: string;
   frameMaterial?: string;
   frameShape?: string;
   gender?: string;
   image_url?: string;
-  images?: string;
+  images?: string;          // JSON string chứa array URLs
   type?: string;
   variant?: string;
   search_type?: string;
-  newPrice?: number;
+  newPrice?: number;        // Giá mới dạng decimal/number (ưu tiên)
 }
 
 // Interface cho Order Data
@@ -110,6 +110,22 @@ interface ChatResponse {
 // URL cơ sở của Host Agent API - sử dụng proxy để bypass CORS
 const API_BASE_URL = "/api";
 
+// Timeout cho API calls (5 phút)
+const API_TIMEOUT = 300000; // 300 giây = 5 phút
+
+// Hàm helper để tạo fetch với timeout
+const fetchWithTimeout = (url: string, options: RequestInit = {}, timeout: number = API_TIMEOUT) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  return fetch(url, {
+    ...options,
+    signal: controller.signal,
+  }).finally(() => {
+    clearTimeout(timeoutId);
+  });
+};
+
 export const useChatApi = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -119,10 +135,9 @@ export const useChatApi = () => {
     const savedSessionId = localStorage.getItem('eyevi_session_id');
     if (savedSessionId) {
       setSessionId(savedSessionId);
-    } else {
-      // Tự động tạo session mới nếu chưa có
-      createNewSession();
+      console.log("Restored session from localStorage:", savedSessionId);
     }
+    // Không tự động tạo session mới, để người dùng tự tạo khi cần
   }, []);
   
   // Lưu sessionId vào localStorage khi thay đổi
@@ -134,17 +149,25 @@ export const useChatApi = () => {
   
   const sendMessage = async (content: string, attachments?: File[]) => {
     setIsLoading(true);
-    
+
     try {
+      // Đảm bảo có sessionId trước khi gửi tin nhắn
+      let currentSessionId = sessionId;
+      if (!currentSessionId) {
+        console.log("No session found, creating new session...");
+        currentSessionId = await createNewSession();
+        if (!currentSessionId) {
+          throw new Error("Failed to create session");
+        }
+      }
+
       // Tạo FormData để gửi request
       const formData = new FormData();
       formData.append("message", content);
       formData.append("user_id", FIXED_USER_ID.toString());
-      
-      // Thêm session_id nếu có
-      if (sessionId) {
-        formData.append("session_id", sessionId);
-      }
+      formData.append("session_id", currentSessionId);
+
+      console.log("Sending message with session:", currentSessionId);
       
       // Thêm files nếu có
       if (attachments && attachments.length > 0) {
@@ -154,8 +177,8 @@ export const useChatApi = () => {
       }
       console.log("formdata: ", formData)
       
-      // Gửi request đến Host Agent
-      const response = await fetch(`${API_BASE_URL}/chat`, {
+      // Gửi request đến Host Agent với timeout
+      const response = await fetchWithTimeout(`${API_BASE_URL}/chat`, {
         method: "POST",
         body: formData,
       });
@@ -188,14 +211,14 @@ export const useChatApi = () => {
   
   const getChatHistory = async () => {
     if (!sessionId) return [];
-    
+
     try {
-      const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/history?user_id=${FIXED_USER_ID}`);
-      
+      const response = await fetchWithTimeout(`${API_BASE_URL}/sessions/${sessionId}/history?user_id=${FIXED_USER_ID}`);
+
       if (!response.ok) {
         throw new Error(`Lỗi: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return data.messages || [];
     } catch (error) {
@@ -203,18 +226,41 @@ export const useChatApi = () => {
       return [];
     }
   };
-  
-  const createNewSession = async () => {
+
+  // Hàm lấy lịch sử chat từ session_id cụ thể (để xem lịch sử)
+  const getChatHistoryBySessionId = async (targetSessionId: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/sessions/create`, {
-        method: "POST"
-      });
-      
+      const response = await fetchWithTimeout(`${API_BASE_URL}/sessions/${targetSessionId}/history?user_id=${FIXED_USER_ID}`);
+
       if (!response.ok) {
         throw new Error(`Lỗi: ${response.status}`);
       }
-      
+
       const data = await response.json();
+      return data.messages || [];
+    } catch (error) {
+      console.error("Lỗi khi lấy lịch sử chat theo session ID:", error);
+      return [];
+    }
+  };
+  
+  const createNewSession = async () => {
+    try {
+      console.log("🚀 Creating new session... Current sessionId:", sessionId);
+      const formData = new FormData();
+      formData.append("user_id", FIXED_USER_ID.toString());
+
+      const response = await fetchWithTimeout(`${API_BASE_URL}/sessions/create`, {
+        method: "POST",
+        body: formData
+      });
+
+      if (!response.ok) {
+        throw new Error(`Lỗi: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log("✅ New session created:", data.session_id, "Previous:", sessionId);
       setSessionId(data.session_id);
       return data.session_id;
     } catch (error) {
@@ -227,7 +273,7 @@ export const useChatApi = () => {
     if (!sessionId) return false;
     
     try {
-      const response = await fetch(`${API_BASE_URL}/sessions/${sessionId}/history?user_id=${FIXED_USER_ID}`, {
+      const response = await fetchWithTimeout(`${API_BASE_URL}/sessions/${sessionId}/history?user_id=${FIXED_USER_ID}`, {
         method: "DELETE"
       });
       
@@ -338,6 +384,7 @@ export const useChatApi = () => {
   return {
     sendMessage,
     getChatHistory,
+    getChatHistoryBySessionId,
     createNewSession,
     clearChatHistory,
     getProductById,
