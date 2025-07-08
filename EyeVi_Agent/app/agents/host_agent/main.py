@@ -62,6 +62,33 @@ class ProductResponse(BaseModel):
     newPrice: Optional[float] = None
     image_url: Optional[str] = None  
 
+class ProductFullResponse(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    gender: Optional[str] = None
+    weight: Optional[str] = None
+    quantity: Optional[int] = None
+    images: Optional[str] = None  # dạng JSON string
+    rating: Optional[float] = None
+    newPrice: Optional[float] = None
+    trending: Optional[bool] = None
+    frameMaterial: Optional[str] = None
+    lensMaterial: Optional[str] = None
+    lensFeatures: Optional[str] = None
+    frameShape: Optional[str] = None
+    lensWidth: Optional[str] = None
+    bridgeWidth: Optional[str] = None
+    templeLength: Optional[str] = None
+    color: Optional[str] = None
+    availability: Optional[str] = None
+    price: Optional[float] = None
+    image: Optional[str] = None
+    stock: Optional[int] = None
+    image_url: Optional[str] = None  # URL ảnh được xử lý
+
 @app.on_event("startup")
 async def startup_event():
     """Khởi tạo khi server start"""
@@ -231,6 +258,27 @@ async def get_products_by_ids(product_ids: str):
     except Exception as e:
         logger.error(f"❌ Lỗi khi lấy thông tin sản phẩm: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy thông tin sản phẩm: {str(e)}")
+
+@app.get("/allProducts", response_model=List[ProductFullResponse])
+async def get_all_products():
+    """
+    Lấy toàn bộ sản phẩm trong database với tất cả các trường thông tin
+    """
+    try:
+        logger.info("🔍 Đang lấy toàn bộ sản phẩm từ database")
+        
+        products = db_connector.get_all_products()
+        
+        if not products:
+            logger.warning("❌ Không tìm thấy sản phẩm nào trong database")
+            return []
+        
+        logger.info(f"✅ Đã lấy thành công {len(products)} sản phẩm")
+        return products
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy toàn bộ sản phẩm: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy toàn bộ sản phẩm: {str(e)}")
 
 @app.get("/agents/status")
 async def get_agents_status():

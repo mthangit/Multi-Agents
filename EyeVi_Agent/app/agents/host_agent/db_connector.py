@@ -104,6 +104,45 @@ class DatabaseConnector:
             self.connect()
             return []
     
+    def get_all_products(self) -> List[Dict]:
+        """
+        Lấy toàn bộ sản phẩm từ database với tất cả các trường
+        """
+        try:
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                query = """
+                SELECT id, name, description, brand, category, gender, weight, 
+                       quantity, images, rating, newPrice, trending, frameMaterial, 
+                       lensMaterial, lensFeatures, frameShape, lensWidth, bridgeWidth, 
+                       templeLength, color, availability, price, image, stock
+                FROM products
+                """
+                cursor.execute(query)
+                products = cursor.fetchall()
+                
+                # Xử lý trường images cho mỗi sản phẩm
+                for product in products:
+                    if product.get('images'):
+                        try:
+                            import json
+                            images_list = json.loads(product['images'])
+                            if images_list and len(images_list) > 0:
+                                product['image_url'] = images_list[0]
+                        except Exception as e:
+                            logger.warning(f"Không thể parse trường images: {e}")
+                    
+                    # Sử dụng trường image nếu không có images
+                    if not product.get('image_url') and product.get('image'):
+                        product['image_url'] = product['image']
+                
+                return products
+                
+        except Exception as e:
+            logger.error(f"Error getting all products: {str(e)}")
+            self.connect()
+            return []
+
     def close(self):
         if self.connection and self.connection.open:
             self.connection.close()
