@@ -215,19 +215,19 @@ const ProductDetails = () => {
             All
           </button>
           <button className="btn-third text-lg text-center bg-white rounded-md ml-2 px-2">
-            5 Start
+            5 Stars
           </button>
           <button className="btn-third text-lg text-center bg-white rounded-md ml-2 px-2">
-            4 Start
+            4 Stars
           </button>
           <button className="btn-third text-lg text-center bg-white rounded-md ml-2 px-2">
-            2 Start
+            3 Stars
           </button>
           <button className="btn-third text-lg text-center bg-white rounded-md ml-2 px-2">
-            3 Start
+            2 Stars
           </button>
           <button className="btn-third text-lg text-center bg-white rounded-md ml-2 px-2">
-            1 Start
+            1 Star
           </button>
         </div>
         {/*  */}
