@@ -137,13 +137,13 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
               <>
                 {message.products && message.products.length > 0 && (
                   <div className="mt-2 w-full">
-                    <ProductList products={message.products} maxDisplay={3} />
+                    <ProductList products={message.products} initialDisplay={3} loadMoreCount={5} />
                   </div>
                 )}
-                
+
                 {message.extracted_product_ids && message.extracted_product_ids.length > 0 && (
                   <div className="mt-2 w-full">
-                    <ProductList productIds={message.extracted_product_ids} maxDisplay={3} />
+                    <ProductList productIds={message.extracted_product_ids} initialDisplay={3} loadMoreCount={5} />
                   </div>
                 )}
 

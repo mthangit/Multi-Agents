@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProductCard from "./product-card";
 import { ProductData, useChatApi } from "@/hooks/useChatApi";
-import { X } from "lucide-react";
-import { useChatContext } from "./chat-container";
+import { Package, ChevronDown, ChevronUp } from "lucide-react";
+import { Button } from "./ui/button";
+
 
 interface ProductListProps {
   products?: ProductData[];
   productIds?: string[];
-  maxDisplay?: number;
+  initialDisplay?: number;
+  loadMoreCount?: number;
 }
 
 // Interface cho dữ liệu sản phẩm từ API
@@ -41,17 +43,38 @@ interface ApiProduct {
   stock?: number;
 }
 
-const ProductList: React.FC<ProductListProps> = ({ products: initialProducts, productIds, maxDisplay = 5 }) => {
+const ProductList: React.FC<ProductListProps> = ({
+  products: initialProducts,
+  productIds,
+  initialDisplay = 3,
+  loadMoreCount = 5
+}) => {
   const [products, setProducts] = useState<ProductData[]>(initialProducts || []);
   const [loading, setLoading] = useState(false);
-  const [visible, setVisible] = useState(true);
+  const [displayCount, setDisplayCount] = useState(initialDisplay);
+  const [isExpanded, setIsExpanded] = useState(false);
   const { getProductsByIds } = useChatApi();
-  const { setChatInputMessage } = useChatContext();
   
   // Refs để theo dõi việc đã fetch dữ liệu hay chưa
   const hasFetchedIdsRef = useRef<boolean>(false);
   const hasFetchedMissingDetailsRef = useRef<boolean>(false);
   const processedProductIdsRef = useRef<Set<string>>(new Set());
+
+  // Xử lý logic hiển thị sản phẩm
+  const displayProducts = products.slice(0, displayCount);
+  const hasMoreProducts = products.length > displayCount;
+  const remainingProducts = products.length - displayCount;
+
+  const handleLoadMore = () => {
+    const newCount = Math.min(displayCount + loadMoreCount, products.length);
+    setDisplayCount(newCount);
+    setIsExpanded(true);
+  };
+
+  const handleCollapse = () => {
+    setDisplayCount(initialDisplay);
+    setIsExpanded(false);
+  };
   
   // Nếu có initialProducts, sử dụng chúng làm dữ liệu ban đầu
   useEffect(() => {
@@ -220,31 +243,12 @@ const ProductList: React.FC<ProductListProps> = ({ products: initialProducts, pr
     fetchMissingDetails();
   }, [products, getProductsByIds]);
   
-  // Xử lý ẩn danh sách sản phẩm
-  const handleHideProductList = useCallback(() => {
-    setVisible(false);
-  }, []);
+
   
-  // Xử lý khi click vào nút "Xem thêm"
-  const handleViewMore = useCallback(() => {
-    if (products.length > 0) {
-      // Tạo một tin nhắn liệt kê tất cả sản phẩm
-      const productList = products
-        .slice(maxDisplay)
-        .map(p => `${p.name || 'Sản phẩm kính mắt'} (ID: ${p.product_id})`)
-        .join(', ');
-      
-      setChatInputMessage(`Tôi muốn xem thêm thông tin về các sản phẩm: ${productList}`);
-    }
-  }, [products, maxDisplay, setChatInputMessage]);
+
+
   
-  // Nếu đã ẩn, không hiển thị gì cả
-  if (!visible) {
-    return null;
-  }
-  
-  // Giới hạn số lượng sản phẩm hiển thị
-  const displayProducts = products.slice(0, maxDisplay);
+
   
   if (loading && products.length === 0) {
     return (
@@ -278,32 +282,48 @@ const ProductList: React.FC<ProductListProps> = ({ products: initialProducts, pr
   }
   
   return (
-    <div className="w-full py-3 px-4 border-t border-border">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-medium">Danh sách sản phẩm ({products.length})</h3>
-        <button 
-          onClick={handleHideProductList}
-          className="p-1 rounded-full hover:bg-muted transition-colors"
-          aria-label="Ẩn danh sách sản phẩm"
-        >
-          <X className="h-4 w-4" />
-        </button>
+    <div className="w-full space-y-3">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3">
+        <Package className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium text-foreground">
+          Danh sách sản phẩm ({products.length})
+        </span>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+
+      {/* Danh sách sản phẩm */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {displayProducts.map((product) => (
           <ProductCard key={product.product_id} product={product} />
         ))}
       </div>
-      {products.length > maxDisplay && (
-        <div className="mt-3 text-center">
-          <button 
-            className="text-sm text-primary hover:underline"
-            onClick={handleViewMore}
+
+      {/* Nút xem thêm/thu gọn */}
+      <div className="flex justify-center pt-2">
+        {hasMoreProducts && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleLoadMore}
+            className="flex items-center gap-2 text-sm"
           >
-            Xem thêm {products.length - maxDisplay} sản phẩm khác
-          </button>
-        </div>
-      )}
+            <ChevronDown className="h-4 w-4" />
+            Xem thêm ({remainingProducts} sản phẩm)
+          </Button>
+        )}
+
+        {isExpanded && displayCount > initialDisplay && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCollapse}
+            className="flex items-center gap-2 text-sm ml-2"
+          >
+            <ChevronUp className="h-4 w-4" />
+            Thu gọn
+          </Button>
+        )}
+      </div>
     </div>
   );
 };

@@ -2,7 +2,8 @@
 
 import React from "react";
 import { OrderData } from "@/hooks/useChatApi";
-import { Package, MapPin, Phone, User, Calendar, DollarSign } from "lucide-react";
+import { Package, MapPin, Phone, User, Calendar, DollarSign, ExternalLink } from "lucide-react";
+import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
 interface OrderCardProps {
@@ -16,6 +17,13 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
       style: 'currency',
       currency: 'VND'
     }).format(price);
+  };
+
+  // Xử lý sự kiện khi click vào nút Chi tiết đơn hàng
+  const handleViewOrderDetails = () => {
+    const shopDomain = process.env.NEXT_PUBLIC_SHOP_DOMAIN || 'https://eyevishop.onrender.com';
+    const orderUrl = `${shopDomain}/order/${order.id}`;
+    window.open(orderUrl, '_blank', 'noopener,noreferrer');
   };
 
   // Format ngày tháng
@@ -119,10 +127,21 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
       </div>
 
       {/* Ngày tạo */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+      <div className="flex items-center gap-2 text-sm text-muted-foreground mb-3">
         <Calendar className="h-4 w-4" />
         <span className="truncate">{formatDate(order.created_at)}</span>
       </div>
+
+      {/* Button Chi tiết */}
+      <Button
+        size="sm"
+        variant="outline"
+        className="w-full text-xs h-8"
+        onClick={handleViewOrderDetails}
+      >
+        <ExternalLink className="h-3 w-3 mr-1" />
+        Chi tiết đơn hàng
+      </Button>
     </div>
   );
 };

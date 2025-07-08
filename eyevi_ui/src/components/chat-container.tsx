@@ -1,15 +1,15 @@
 "use client";
 
-import React, { useState, useEffect, useRef, createContext, useContext } from "react";
+import React, { useState, useEffect, useRef, createContext, useContext, useImperativeHandle, forwardRef } from "react";
 import ChatHeader from "./chat-header";
 import ChatMessages from "./chat-messages";
 import ChatInput, { ChatInputRef } from "./chat-input";
-import ProductList from "./product-list";
 import { useChatApi, ProductData, OrderData } from "@/hooks/useChatApi";
 
 // Tạo context để truy cập chatInputRef từ các component khác
 interface ChatContextType {
   setChatInputMessage: (text: string) => void;
+  loadHistoryBySessionId: (sessionId: string) => void;
 }
 
 export const ChatContext = createContext<ChatContextType | null>(null);
@@ -21,6 +21,12 @@ export const useChatContext = () => {
   }
   return context;
 };
+
+// Interface cho ChatContainer ref
+export interface ChatContainerRef {
+  loadHistoryBySessionId: (sessionId: string) => void;
+  resetChat: () => void;
+}
 
 // Interface cho Message trong ChatContainer
 interface ContainerMessage {
@@ -61,28 +67,141 @@ const LOADING_STEPS = [
   "Đang chuẩn bị phản hồi...",
 ];
 
-const ChatContainer = () => {
-  const { sendMessage, createNewSession, isLoading, sessionId } = useChatApi();
-  const [messages, setMessages] = useState<ContainerMessage[]>([
-    {
-      id: 1,
-      role: "assistant",
-      content: "Xin chào! Tôi là EyeVi, trợ lý ảo hỗ trợ bạn mua sắm kính mắt. Tôi có thể giúp gì cho bạn hôm nay?",
-      timestamp: new Date().toISOString(),
-    },
-  ]);
+const ChatContainer = forwardRef<ChatContainerRef>((_, ref) => {
+  const { sendMessage, createNewSession, getChatHistoryBySessionId, isLoading, sessionId } = useChatApi();
+  const [messages, setMessages] = useState<ContainerMessage[]>([]);
   const [products, setProducts] = useState<ProductData[]>([]);
   const [productIds, setProductIds] = useState<string[]>([]);
   const [loadingMessageId, setLoadingMessageId] = useState<number | null>(null);
   const [loadingStepIndex, setLoadingStepIndex] = useState(0);
+  const [isViewingHistory, setIsViewingHistory] = useState(false);
+  const [viewingSessionId, setViewingSessionId] = useState<string | null>(null);
+  const [resetTrigger, setResetTrigger] = useState(0);
+
+  // Lưu tạm chat hiện tại khi xem lịch sử
+  const [tempCurrentMessages, setTempCurrentMessages] = useState<ContainerMessage[]>([]);
+  const [tempCurrentProducts, setTempCurrentProducts] = useState<ProductData[]>([]);
+  const [tempCurrentProductIds, setTempCurrentProductIds] = useState<string[]>([]);
+
   const chatInputRef = useRef<ChatInputRef>(null);
+  const previousSessionIdRef = useRef<string | null>(null);
+
+  // Reset messages khi sessionId thay đổi (tạo session mới)
+  useEffect(() => {
+    console.log("SessionId effect triggered:", {
+      sessionId,
+      previousSessionId: previousSessionIdRef.current,
+      isViewingHistory,
+      messagesLength: messages.length
+    });
+
+    if (sessionId && sessionId !== previousSessionIdRef.current && !isViewingHistory) {
+      console.log("🔄 Resetting chat container - Session changed from", previousSessionIdRef.current, "to", sessionId);
+
+      // Reset tất cả state khi có session mới
+      setMessages([]);
+      setProducts([]);
+      setProductIds([]);
+      setLoadingMessageId(null);
+
+      // Cập nhật ref để theo dõi session hiện tại
+      previousSessionIdRef.current = sessionId;
+    }
+  }, [sessionId, isViewingHistory]);
+
+  // Khởi tạo tin nhắn chào mừng khi có sessionId và messages rỗng
+  useEffect(() => {
+    console.log("Welcome message effect triggered:", {
+      sessionId,
+      isViewingHistory,
+      messagesLength: messages.length,
+      resetTrigger
+    });
+
+    if (sessionId && !isViewingHistory && messages.length === 0) {
+      console.log("✅ Adding welcome message");
+      setMessages([
+        {
+          id: 1,
+          role: "assistant",
+          content: "Xin chào! Tôi là EyeVi, trợ lý ảo hỗ trợ bạn mua sắm kính mắt. Tôi có thể giúp gì cho bạn hôm nay?",
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    }
+  }, [sessionId, isViewingHistory, messages.length, resetTrigger]);
+
+  // Function để reset chat
+  const resetChat = () => {
+    console.log("🔄 Manual reset chat triggered");
+    setMessages([]);
+    setProducts([]);
+    setProductIds([]);
+    setLoadingMessageId(null);
+    setIsViewingHistory(false);
+    setViewingSessionId(null);
+
+    // Clear temp data
+    setTempCurrentMessages([]);
+    setTempCurrentProducts([]);
+    setTempCurrentProductIds([]);
+
+    setResetTrigger(prev => prev + 1);
+  };
+
+  // Function để load lịch sử từ session_id cụ thể
+  const loadHistoryBySessionId = async (targetSessionId: string) => {
+    try {
+      console.log("📚 Loading history for session:", targetSessionId);
+
+      // Lưu tạm chat hiện tại trước khi xem lịch sử
+      console.log("💾 Saving current chat temporarily");
+      setTempCurrentMessages([...messages]);
+      setTempCurrentProducts([...products]);
+      setTempCurrentProductIds([...productIds]);
+
+      setIsViewingHistory(true);
+      setViewingSessionId(targetSessionId);
+
+      const historyMessages = await getChatHistoryBySessionId(targetSessionId);
+
+      // Chuyển đổi format từ API thành ContainerMessage
+      const formattedMessages: ContainerMessage[] = historyMessages.map((msg: any, index: number) => ({
+        id: index + 1,
+        role: msg.sender_type === "user" ? "user" : "assistant",
+        content: msg.message_content,
+        timestamp: msg.created_at,
+        products: msg.metadata?.products,
+        extracted_product_ids: msg.metadata?.extracted_product_ids,
+        orders: msg.metadata?.orders,
+        agent_used: msg.metadata?.agent_used,
+        is_loading: false,
+      }));
+
+      setMessages(formattedMessages);
+      setProducts([]);
+      setProductIds([]);
+      setLoadingMessageId(null);
+
+      console.log("✅ History loaded, current chat saved temporarily");
+    } catch (error) {
+      console.error("Lỗi khi load lịch sử:", error);
+    }
+  };
+
+  // Expose methods to parent components via ref
+  useImperativeHandle(ref, () => ({
+    loadHistoryBySessionId,
+    resetChat
+  }));
 
   // Tạo context value
   const chatContextValue = {
     setChatInputMessage: (text: string) => {
       chatInputRef.current?.setInputMessage(text);
       chatInputRef.current?.focusInput();
-    }
+    },
+    loadHistoryBySessionId
   };
 
   // Tạo session mới khi component mount nếu chưa có
@@ -221,35 +340,80 @@ const ChatContainer = () => {
 
   // Xử lý tạo cuộc trò chuyện mới
   const handleNewChat = async () => {
-    const newSessionId = await createNewSession();
-    if (newSessionId) {
-      setMessages([
-        {
-          id: 1,
-          role: "assistant",
-          content: "Xin chào! Tôi là EyeVi, trợ lý ảo hỗ trợ bạn mua sắm kính mắt. Tôi có thể giúp gì cho bạn hôm nay?",
-          timestamp: new Date().toISOString(),
-        },
-      ]);
-      setProducts([]);
-      setProductIds([]);
-      setLoadingMessageId(null);
+    try {
+      // Reset state trước khi tạo session mới
+      setIsViewingHistory(false);
+      setViewingSessionId(null);
+
+      // Tạo session mới và đợi kết quả
+      const newSessionId = await createNewSession();
+      console.log("Created new session:", newSessionId);
+
+      if (newSessionId) {
+        // Messages sẽ được reset tự động bởi useEffect khi sessionId thay đổi
+        // Tin nhắn chào mừng sẽ được thêm tự động sau đó
+        console.log("New chat initialized with session:", newSessionId);
+      } else {
+        console.error("Failed to create new session");
+        // Nếu tạo session thất bại, vẫn hiển thị tin nhắn chào mừng
+        setMessages([
+          {
+            id: 1,
+            role: "assistant",
+            content: "Xin chào! Tôi là EyeVi, trợ lý ảo hỗ trợ bạn mua sắm kính mắt. Tôi có thể giúp gì cho bạn hôm nay?",
+            timestamp: new Date().toISOString(),
+          },
+        ]);
+      }
+    } catch (error) {
+      console.error("Error creating new chat:", error);
     }
+  };
+
+  // Xử lý quay lại chat hiện tại
+  const handleBackToCurrentChat = async () => {
+    console.log("🔙 Returning to current chat");
+
+    setIsViewingHistory(false);
+    setViewingSessionId(null);
+    setLoadingMessageId(null);
+
+    // Restore chat đã lưu tạm
+    console.log("📤 Restoring temporarily saved chat");
+    setMessages([...tempCurrentMessages]);
+    setProducts([...tempCurrentProducts]);
+    setProductIds([...tempCurrentProductIds]);
+
+    // Clear temp data
+    setTempCurrentMessages([]);
+    setTempCurrentProducts([]);
+    setTempCurrentProductIds([]);
+
+    console.log("✅ Current chat restored");
   };
 
   return (
     <ChatContext.Provider value={chatContextValue}>
       <div className="flex flex-col flex-1 h-screen overflow-hidden">
-        <ChatHeader onNewChat={handleNewChat} />
+        <ChatHeader
+          onNewChat={handleNewChat}
+          isViewingHistory={isViewingHistory}
+          onBackToCurrentChat={handleBackToCurrentChat}
+        />
         <div className="flex-1 overflow-hidden flex flex-col">
           <ChatMessages messages={transformMessages()} />
-          {products.length > 0 && <ProductList products={products} />}
-          {productIds.length > 0 && products.length === 0 && <ProductList productIds={productIds} />}
         </div>
-        <ChatInput ref={chatInputRef} onSendMessage={handleSendMessage} isLoading={isLoading || loadingMessageId !== null} />
+        <ChatInput
+          ref={chatInputRef}
+          onSendMessage={handleSendMessage}
+          isLoading={isLoading || loadingMessageId !== null}
+          disabled={isViewingHistory}
+        />
       </div>
     </ChatContext.Provider>
   );
-};
+});
 
-export default ChatContainer; 
+ChatContainer.displayName = "ChatContainer";
+
+export default ChatContainer;

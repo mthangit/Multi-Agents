@@ -9,9 +9,11 @@ import { Popover } from "@/components/ui/popover";
 
 interface ChatHeaderProps {
   onNewChat?: () => void;
+  isViewingHistory?: boolean;
+  onBackToCurrentChat?: () => void;
 }
 
-const ChatHeader = ({ onNewChat }: ChatHeaderProps) => {
+const ChatHeader = ({ onNewChat, isViewingHistory, onBackToCurrentChat }: ChatHeaderProps) => {
   const { sessionId } = useChatApi();
   const { theme, toggleTheme } = useTheme();
   const [title, setTitle] = useState("Trò chuyện mới");
@@ -34,8 +36,18 @@ const ChatHeader = ({ onNewChat }: ChatHeaderProps) => {
 
   return (
     <header className="flex items-center justify-between border-b border-border h-14 px-4">
-      <div className="flex items-center">
-        <h2 className="text-lg font-medium">{title}</h2>
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-medium">{isViewingHistory ? "Xem lịch sử" : title}</h2>
+        {isViewingHistory && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onBackToCurrentChat}
+            className="text-xs"
+          >
+            Quay lại chat hiện tại
+          </Button>
+        )}
       </div>
       <div className="flex items-center gap-2">
         {onNewChat && (
