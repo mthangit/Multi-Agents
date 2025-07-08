@@ -189,10 +189,29 @@ class MySQLMessageHistory:
         agent_name: str,
         user_id: Optional[int] = None,
         response_data: Optional[Dict[str, Any]] = None,
-        analysis: Optional[str] = None
+        analysis: Optional[str] = None,
+        orders: Optional[List[Dict[str, Any]]] = None,
+        user_info: Optional[Dict[str, Any]] = None,
+        products: Optional[List[Dict[str, Any]]] = None,
+        extracted_product_ids: Optional[List[str]] = None
     ) -> Optional[int]:
         """
-        Save agent response message
+        Save agent response message với thông tin đầy đủ về products, orders, user_info
+        
+        Args:
+            session_id: ID phiên chat
+            message_content: Nội dung tin nhắn
+            agent_name: Tên agent
+            user_id: ID người dùng (optional)
+            response_data: Dữ liệu response (optional)
+            analysis: Phân tích (optional)
+            orders: Danh sách đơn hàng (optional)
+            user_info: Thông tin user (optional) 
+            products: Danh sách sản phẩm (optional)
+            extracted_product_ids: Danh sách product IDs được trích xuất (optional)
+            
+        Returns:
+            ID của message đã save, hoặc None nếu fail
         """
         # Map agent name to sender_type
         agent_mapping = {
@@ -208,11 +227,29 @@ class MySQLMessageHistory:
             "agent_name": agent_name
         }
         
+        # Lưu response_data nếu có
         if response_data:
             metadata["response_data"] = response_data
             
+        # Lưu analysis nếu có
         if analysis:
             metadata["analysis"] = analysis
+            
+        # Lưu danh sách orders nếu có (thông tin chi tiết đơn hàng)
+        if orders and len(orders) > 0:
+            metadata["orders"] = orders
+            
+        # Lưu thông tin user nếu có
+        if user_info and user_info:
+            metadata["user_info"] = user_info
+            
+        # Lưu danh sách products nếu có (thông tin chi tiết sản phẩm)
+        if products and len(products) > 0:
+            metadata["products"] = products
+            
+        # Lưu danh sách product IDs được trích xuất
+        if extracted_product_ids and len(extracted_product_ids) > 0:
+            metadata["extracted_product_ids"] = extracted_product_ids
         
         return await self.save_message(
             session_id=session_id,

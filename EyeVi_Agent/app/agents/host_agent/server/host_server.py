@@ -36,6 +36,10 @@ class HostServer:
         
         # MySQL Message History cho real-time logging
         self.mysql_history = MySQLMessageHistory()
+        
+        # Database Connector để query thông tin sản phẩm
+        from db_connector import DatabaseConnector
+        self.db_connector = DatabaseConnector()
 
     async def initialize(self):
         """Khởi tạo các components cần thiết"""
@@ -53,6 +57,14 @@ class HostServer:
             
             # Setup orchestrator chain
             await self._setup_orchestrator_chain()
+            
+            # Khởi tạo Database Connector
+            try:
+                self.db_connector.connect()
+                logger.info("✅ Database Connector initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ Database Connector failed to initialize: {e}")
+                logger.warning("📝 Product enrichment with images will be disabled")
             
             # Khởi tạo A2A Client Manager
             await self.a2a_client_manager.initialize()
@@ -263,7 +275,11 @@ class HostServer:
                     clarified_message=clarified_message,
                     agent_name=decision["selected_agent"],
                     response_data=agent_response_data.get("data", []),
-                    analysis=decision.get("analysis", "")
+                    analysis=decision.get("analysis", ""),
+                    orders=agent_response_data.get("orders", []),
+                    user_info=agent_response_data.get("user_info", {}),
+                    products=agent_response_data.get("data", []),
+                    extracted_product_ids=decision.get("extracted_product_ids", [])
                 )
 
                 return {    
@@ -289,7 +305,11 @@ class HostServer:
                     session_id=session_id, 
                     clarified_message=clarified_message,
                     agent_name="Host Agent",
-                    analysis=decision.get("analysis", "")
+                    analysis=decision.get("analysis", ""),
+                    orders=[],
+                    user_info={},
+                    products=[],
+                    extracted_product_ids=decision.get("extracted_product_ids", [])
                 )
                                 
                 return {
@@ -386,8 +406,12 @@ class HostServer:
                     clarified_message=None,
                     agent_name="Search Agent",
                     files=files,
-                    response_data=agent_response_data.get("data"),
-                    analysis=None
+                    response_data=agent_response_data.get("data", []),
+                    analysis=None,
+                    orders=agent_response_data.get("orders", []),
+                    user_info=agent_response_data.get("user_info", {}),
+                    products=agent_response_data.get("data", []),
+                    extracted_product_ids=None
                 )
                 
                 return {
@@ -524,6 +548,148 @@ class HostServer:
                 logger.error(f"❌ Lỗi khi lưu messages vào MySQL: {e}")
                 # MySQL failure không block user experience
 
+    def _convert_decimal_to_serializable(self, obj: Any) -> Any:
+        """
+        Convert Decimal objects to float/int để tránh JSON serialization errors
+        
+        Args:
+            obj: Object cần convert (có thể là dict, list, hoặc primitive)
+            
+        Returns:
+            Object đã được convert với Decimal → float/int
+        """
+        from decimal import Decimal
+        
+        if isinstance(obj, Decimal):
+            # Convert Decimal to float, hoặc int nếu là số nguyên
+            if obj % 1 == 0:
+                return int(obj)
+            else:
+                return float(obj)
+        elif isinstance(obj, dict):
+            # Recursively convert dict
+            return {key: self._convert_decimal_to_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            # Recursively convert list
+            return [self._convert_decimal_to_serializable(item) for item in obj]
+        else:
+            # Return as-is for other types
+            return obj
+
+    async def _enrich_products_with_images(self, products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        Enrich products với thông tin đầy đủ từ database (images, prices, descriptions, etc.)
+        
+        Args:
+            products: Danh sách products từ agent response
+            
+        Returns:
+            Danh sách products đã được enriched với thông tin đầy đủ từ database
+        """
+        if not products or len(products) == 0:
+            return products
+            
+        try:
+            # Extract product IDs từ products list
+            product_ids = []
+            for product in products:
+                if isinstance(product, dict):
+                    # Thử các field có thể chứa ID
+                    product_id = product.get('product_id') or product.get('id') or product.get('ID')
+                    if product_id:
+                        product_ids.append(str(product_id))
+            
+            if not product_ids:
+                logger.debug("⚠️ Không tìm thấy product IDs trong products list")
+                return products
+            
+            logger.debug(f"🔍 Đang enrich {len(product_ids)} products với thông tin đầy đủ từ database")
+            
+            # Query database để lấy thông tin đầy đủ
+            db_products = self.db_connector.get_products_by_ids(product_ids)
+            
+            # Tạo mapping từ product ID tới thông tin database
+            db_data_mapping = {}
+            for db_product in db_products:
+                if db_product and db_product.get('id'):
+                    product_id = str(db_product['id'])
+                    db_data_mapping[product_id] = db_product
+            
+            logger.debug(f"💾 Đã lấy được thông tin database cho {len(db_data_mapping)} products")
+            
+            # Enrich products với thông tin đầy đủ từ database
+            enriched_products = []
+            for product in products:
+                if isinstance(product, dict):
+                    enriched_product = product.copy()
+                    
+                    # Lấy product ID
+                    product_id = product.get('product_id') or product.get('id') or product.get('ID')
+                    if product_id:
+                        product_id_str = str(product_id)
+                        
+                        # Merge thông tin từ database nếu có
+                        if product_id_str in db_data_mapping:
+                            db_data = db_data_mapping[product_id_str]
+                            
+                            # Chuẩn hóa product_id field
+                            enriched_product['product_id'] = product_id_str
+                            
+                            # Merge các field từ database (chỉ thêm nếu chưa có hoặc empty)
+                            db_fields_mapping = {
+                                'price': db_data.get('price'),
+                                'newPrice': db_data.get('newPrice'), 
+                                'image_url': db_data.get('image_url'),
+                                'images': db_data.get('images'),
+                                'description': db_data.get('description'),
+                                'brand': db_data.get('brand'),
+                                'category': db_data.get('category'),
+                                'color': db_data.get('color'),
+                                'gender': db_data.get('gender'),
+                                'frameMaterial': db_data.get('frameMaterial'),
+                                'frameShape': db_data.get('frameShape'),
+                                'rating': db_data.get('rating'),
+                                'stock': db_data.get('stock'),
+                                'availability': db_data.get('availability'),
+                                'weight': db_data.get('weight'),
+                                'quantity': db_data.get('quantity'),
+                                'trending': db_data.get('trending'),
+                                'lensMaterial': db_data.get('lensMaterial'),
+                                'lensFeatures': db_data.get('lensFeatures'),
+                                'lensWidth': db_data.get('lensWidth'),
+                                'bridgeWidth': db_data.get('bridgeWidth'),
+                                'templeLength': db_data.get('templeLength')
+                            }
+                            
+                            # Merge fields - ưu tiên data từ agent, fallback sang database
+                            for field, db_value in db_fields_mapping.items():
+                                if db_value is not None:
+                                    # Convert Decimal to serializable types
+                                    db_value = self._convert_decimal_to_serializable(db_value)
+                                    
+                                    # Nếu field chưa có hoặc empty trong product data từ agent
+                                    if (field not in enriched_product or 
+                                        enriched_product.get(field) is None or 
+                                        enriched_product.get(field) == ""):
+                                        enriched_product[field] = db_value
+                            
+                            logger.debug(f"✅ Enriched product {product_id_str} với thông tin từ database")
+                        else:
+                            logger.debug(f"⚠️ Không tìm thấy thông tin database cho product {product_id_str}")
+                    
+                    enriched_products.append(enriched_product)
+                else:
+                    # Nếu không phải dict, giữ nguyên
+                    enriched_products.append(product)
+            
+            logger.debug(f"🎯 Đã enrich xong {len(enriched_products)} products với thông tin đầy đủ")
+            return enriched_products
+            
+        except Exception as e:
+            logger.error(f"❌ Lỗi khi enrich products với thông tin database: {e}")
+            # Return original products nếu có lỗi
+            return products
+
     async def _save_messages_to_memory_with_agent(
         self, 
         user_message: str, 
@@ -534,9 +700,13 @@ class HostServer:
         clarified_message: Optional[str] = None,
         files: Optional[List[Any]] = None,
         response_data: Optional[Dict[str, Any]] = None,
-        analysis: Optional[str] = None
+        analysis: Optional[str] = None,
+        orders: Optional[List[Dict[str, Any]]] = None,
+        user_info: Optional[Dict[str, Any]] = None,
+        products: Optional[List[Dict[str, Any]]] = None,
+        extracted_product_ids: Optional[List[str]] = None
     ):
-        """Enhanced method để lưu messages với agent information"""
+        """Enhanced method để lưu messages với agent information và đầy đủ thông tin list"""
         # Convert user_id to int for MySQL (safe conversion)
         mysql_user_id = None
         if user_id:
@@ -572,11 +742,24 @@ class HostServer:
                 # Fallback to old method
                 await self._save_user_message_to_history_fallback(user_message, clarified_message or user_message, user_id, session_id, files)
         
-        # Save to MySQL với agent information
+        # Save to MySQL với đầy đủ thông tin về orders, products, user_info
         if self.mysql_history and session_id:
             try:
                 # Prepare file names for metadata
                 file_names = [f.name for f in files] if files else None
+                
+                # ✅ Enrich products với thông tin đầy đủ từ database trước khi lưu
+                enriched_products = products
+                if products and len(products) > 0:
+                    enriched_products = await self._enrich_products_with_images(products)
+                    # Convert any remaining Decimal types để đảm bảo JSON serializable
+                    enriched_products = self._convert_decimal_to_serializable(enriched_products)
+                    logger.debug(f"🎯 Đã enrich {len(enriched_products)} products với thông tin đầy đủ từ database")
+                
+                # ✅ Convert Decimal types trong tất cả metadata để tránh JSON serialization errors
+                safe_orders = self._convert_decimal_to_serializable(orders) if orders else orders
+                safe_user_info = self._convert_decimal_to_serializable(user_info) if user_info else user_info
+                safe_response_data = self._convert_decimal_to_serializable(response_data) if response_data else response_data
                 
                 # Save user message
                 await self.mysql_history.save_user_message(
@@ -587,17 +770,21 @@ class HostServer:
                     files=file_names
                 )
                 
-                # Save AI response với agent information
+                # Save AI response với đầy đủ thông tin list (sử dụng enriched_products)
                 await self.mysql_history.save_agent_message(
                     session_id=session_id,
                     message_content=ai_response,
                     agent_name=agent_name,
                     user_id=mysql_user_id,
-                    response_data=response_data,
-                    analysis=analysis
+                    response_data=safe_response_data,
+                    analysis=analysis,
+                    orders=safe_orders,
+                    user_info=safe_user_info,
+                    products=enriched_products,  # ✅ Sử dụng enriched products với image URLs
+                    extracted_product_ids=extracted_product_ids
                 )
                 
-                logger.debug(f"💾 Đã lưu messages vào MySQL cho session {session_id} (agent: {agent_name})")
+                logger.debug(f"💾 Đã lưu messages vào MySQL cho session {session_id} (agent: {agent_name}) với thông tin đầy đủ")
                 
             except Exception as e:
                 logger.error(f"❌ Lỗi khi lưu messages vào MySQL: {e}")
@@ -794,6 +981,11 @@ class HostServer:
             # Cleanup MySQL connections
             if self.mysql_history:
                 await self.mysql_history.cleanup()
+            
+            # Cleanup Database Connector
+            if self.db_connector:
+                self.db_connector.close()
+                logger.info("✅ Database Connector cleanup completed")
             
             logger.info("✅ Host Server cleanup completed")
         except Exception as e:

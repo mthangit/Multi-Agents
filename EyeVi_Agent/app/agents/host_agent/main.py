@@ -512,7 +512,7 @@ async def get_chat_history(session_id: str, user_id: Optional[str] = None):
         # Lấy 50 tin nhắn mới nhất từ MySQL
         messages = await host_server.mysql_history.get_session_messages(session_id, limit=50, offset=0)
         # Sắp xếp giảm dần theo created_at (mới nhất trước)
-        messages = sorted(messages, key=lambda x: x["created_at"], reverse=True)
+        messages = sorted(messages, key=lambda x: x["created_at"])
         if not messages:
             return {
                 "status": "success",
