@@ -73,7 +73,7 @@ class ProductResponse(BaseModel):
     image_url: Optional[str] = None  
 
 class ProductFullResponse(BaseModel):
-    _id: int  # Sử dụng _id để tương thích với frontend
+    id: int
     name: str
     description: Optional[str] = None
     brand: Optional[str] = None
