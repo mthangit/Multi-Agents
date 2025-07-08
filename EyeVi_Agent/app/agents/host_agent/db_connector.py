@@ -265,6 +265,109 @@ class DatabaseConnector:
                 }
             }
 
+    def get_all_orders(self) -> List[Dict]:
+        """
+        Lấy tất cả đơn hàng từ bảng orders
+        """
+        try:
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                query = """
+                SELECT id, user_id, total_items, total_price, actual_price, 
+                       shipping_address, phone, order_status, created_at, updated_at
+                FROM orders
+                ORDER BY created_at DESC
+                """
+                cursor.execute(query)
+                orders = cursor.fetchall()
+                
+                return orders
+                
+        except Exception as e:
+            logger.error(f"Error getting all orders: {str(e)}")
+            self.connect()
+            return []
+    
+    def get_orders_by_user(self, user_id: int) -> List[Dict]:
+        """
+        Lấy đơn hàng theo user_id
+        """
+        try:
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                query = """
+                SELECT id, user_id, total_items, total_price, actual_price, 
+                       shipping_address, phone, order_status, created_at, updated_at
+                FROM orders
+                WHERE user_id = %s
+                ORDER BY created_at DESC
+                """
+                cursor.execute(query, (user_id,))
+                orders = cursor.fetchall()
+                
+                return orders
+                
+        except Exception as e:
+            logger.error(f"Error getting orders for user {user_id}: {str(e)}")
+            self.connect()
+            return []
+    
+    def get_order_details(self, order_id: int) -> Dict:
+        """
+        Lấy chi tiết đơn hàng bao gồm thông tin sản phẩm
+        """
+        try:
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                # Lấy thông tin đơn hàng
+                order_query = """
+                SELECT id, user_id, total_items, total_price, actual_price, 
+                       shipping_address, phone, order_status, created_at, updated_at
+                FROM orders
+                WHERE id = %s
+                """
+                cursor.execute(order_query, (order_id,))
+                order = cursor.fetchone()
+                
+                if not order:
+                    return None
+                
+                # Lấy chi tiết sản phẩm trong đơn hàng
+                details_query = """
+                SELECT od.id, od.order_id, od.product_id, od.quantity, od.price,
+                       od.created_at, od.updated_at,
+                       p.name as product_name, p.images as product_images, 
+                       p.image as product_image, p.brand, p.category
+                FROM order_details od
+                LEFT JOIN products p ON od.product_id = p.id
+                WHERE od.order_id = %s
+                """
+                cursor.execute(details_query, (order_id,))
+                details = cursor.fetchall()
+                
+                # Xử lý images cho từng sản phẩm trong order details
+                for detail in details:
+                    if detail.get('product_images'):
+                        try:
+                            import json
+                            images_list = json.loads(detail['product_images'])
+                            if images_list and len(images_list) > 0:
+                                detail['product_image_url'] = images_list[0]
+                        except Exception as e:
+                            logger.warning(f"Không thể parse product images: {e}")
+                    
+                    # Fallback to product_image if no images
+                    if not detail.get('product_image_url') and detail.get('product_image'):
+                        detail['product_image_url'] = detail['product_image']
+                
+                order['details'] = details
+                return order
+                
+        except Exception as e:
+            logger.error(f"Error getting order details for order {order_id}: {str(e)}")
+            self.connect()
+            return None
+
     def close(self):
         if self.connection and self.connection.open:
             self.connection.close()

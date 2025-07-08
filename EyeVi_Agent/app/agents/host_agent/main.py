@@ -119,6 +119,46 @@ class PaginatedProductsResponse(BaseModel):
     pagination: PaginationInfo
     filters: FilterInfo
 
+class OrderResponse(BaseModel):
+    id: int
+    user_id: int
+    total_items: int
+    total_price: float
+    actual_price: float
+    shipping_address: Optional[str] = None
+    phone: Optional[str] = None
+    order_status: str
+    created_at: str
+    updated_at: str
+
+class OrderDetailItem(BaseModel):
+    id: int
+    order_id: int
+    product_id: int
+    quantity: int
+    price: float
+    product_name: Optional[str] = None
+    product_images: Optional[str] = None
+    product_image: Optional[str] = None
+    product_image_url: Optional[str] = None
+    brand: Optional[str] = None
+    category: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+class OrderDetailResponse(BaseModel):
+    id: int
+    user_id: int
+    total_items: int
+    total_price: float
+    actual_price: float
+    shipping_address: Optional[str] = None
+    phone: Optional[str] = None
+    order_status: str
+    created_at: str
+    updated_at: str
+    details: List[OrderDetailItem]
+
 @app.on_event("startup")
 async def startup_event():
     """Khởi tạo khi server start"""
@@ -361,6 +401,71 @@ async def get_products_paginated(
     except Exception as e:
         logger.error(f"❌ Lỗi khi lấy sản phẩm phân trang: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy sản phẩm phân trang: {str(e)}")
+
+@app.get("/orders", response_model=List[OrderResponse])
+async def get_all_orders():
+    """
+    Lấy tất cả đơn hàng từ database (không cần xác thực)
+    """
+    try:
+        logger.info("🔍 Đang lấy tất cả đơn hàng từ database")
+        
+        orders = db_connector.get_all_orders()
+        
+        if not orders:
+            logger.warning("❌ Không tìm thấy đơn hàng nào trong database")
+            return []
+        
+        logger.info(f"✅ Đã lấy thành công {len(orders)} đơn hàng")
+        return orders
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy tất cả đơn hàng: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy tất cả đơn hàng: {str(e)}")
+
+@app.get("/orders/user/{user_id}", response_model=List[OrderResponse])
+async def get_orders_by_user(user_id: int):
+    """
+    Lấy đơn hàng theo user_id (không cần xác thực)
+    """
+    try:
+        logger.info(f"🔍 Đang lấy đơn hàng cho user {user_id}")
+        
+        orders = db_connector.get_orders_by_user(user_id)
+        
+        if not orders:
+            logger.warning(f"❌ Không tìm thấy đơn hàng nào cho user {user_id}")
+            return []
+        
+        logger.info(f"✅ Đã lấy thành công {len(orders)} đơn hàng cho user {user_id}")
+        return orders
+        
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy đơn hàng cho user {user_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy đơn hàng cho user {user_id}: {str(e)}")
+
+@app.get("/orders/{order_id}/details", response_model=OrderDetailResponse)
+async def get_order_details(order_id: int):
+    """
+    Lấy chi tiết đơn hàng bao gồm thông tin sản phẩm (không cần xác thực)
+    """
+    try:
+        logger.info(f"🔍 Đang lấy chi tiết đơn hàng {order_id}")
+        
+        order_details = db_connector.get_order_details(order_id)
+        
+        if not order_details:
+            logger.warning(f"❌ Không tìm thấy đơn hàng với ID {order_id}")
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy đơn hàng với ID {order_id}")
+        
+        logger.info(f"✅ Đã lấy thành công chi tiết đơn hàng {order_id} với {len(order_details.get('details', []))} sản phẩm")
+        return order_details
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy chi tiết đơn hàng {order_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy chi tiết đơn hàng {order_id}: {str(e)}")
 
 @app.get("/agents/status")
 async def get_agents_status():
