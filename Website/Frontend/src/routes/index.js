@@ -33,7 +33,6 @@ const Index = () => {
       </Route>
       <Route element={<SharedLayout />}>
         <Route path="/" element={<Home />} index />
-        <Route path="*" element={<ErrorPage />} />
         {contentRoutes.map((route, idx) => (
           <Route key={idx} path={route.path} element={route.element} />
         ))}
@@ -43,6 +42,9 @@ const Index = () => {
             <Route key={idx} path={route.path} element={route.element} />
           ))}
         </Route>
+        
+        {/* Catch-all route phải đặt cuối cùng */}
+        <Route path="*" element={<ErrorPage />} />
       </Route>
       <Route element={<RequiresAuth />}>
         <Route element={<AdminLayout />}>

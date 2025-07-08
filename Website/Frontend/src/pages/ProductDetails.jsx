@@ -39,6 +39,9 @@ const ProductDetails = () => {
 
   useEffect(() => {
     const fetchProductDetails = async () => {
+      console.log("🚀 ProductDetails mounted với productId:", productId);
+      console.log("🔍 LocalProduct từ context:", localProduct);
+      
       setLoading(true);
       setError(null);
       
