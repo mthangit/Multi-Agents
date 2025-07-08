@@ -304,6 +304,28 @@ async def get_product(product_id: str):
         logger.error(f"❌ Lỗi khi lấy thông tin sản phẩm: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy thông tin sản phẩm: {str(e)}")
 
+@app.get("/web-product/{product_id}", response_model=Optional[ProductFullResponse])
+async def get_web_product_details(product_id: str):
+    """
+    Lấy chi tiết đầy đủ sản phẩm theo ID cho web frontend (tương tự get_all_products)
+    """
+    try:
+        logger.info(f"🔍 Đang tìm chi tiết sản phẩm web với ID: {product_id}")
+        product = db_connector.get_product_details_by_id(product_id)
+        
+        if not product:
+            logger.warning(f"❌ Không tìm thấy sản phẩm với ID: {product_id}")
+            raise HTTPException(status_code=404, detail=f"Không tìm thấy sản phẩm với ID: {product_id}")
+        
+        logger.info(f"✅ Đã tìm thấy chi tiết sản phẩm: {product.get('name', 'Unknown')}")
+        return product
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy chi tiết sản phẩm web: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy chi tiết sản phẩm web: {str(e)}")
+
 @app.get("/products", response_model=List[ProductResponse])
 async def get_products_by_ids(product_ids: str):
     """

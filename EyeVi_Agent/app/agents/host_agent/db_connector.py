@@ -103,6 +103,50 @@ class DatabaseConnector:
             logger.error(f"Error getting products by IDs: {str(e)}")
             self.connect()
             return []
+
+    def get_product_details_by_id(self, product_id: str) -> Optional[Dict]:
+        """
+        Lấy chi tiết đầy đủ của sản phẩm theo ID (tương tự get_all_products nhưng cho 1 sản phẩm)
+        """
+        try:
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                query = """
+                SELECT id, name, description, brand, category, gender, weight, 
+                       quantity, images, rating, newPrice, trending, frameMaterial, 
+                       lensMaterial, lensFeatures, frameShape, lensWidth, bridgeWidth, 
+                       templeLength, color, availability, price, image, stock
+                FROM products 
+                WHERE id = %s
+                """
+                cursor.execute(query, (product_id,))
+                product = cursor.fetchone()
+                
+                if not product:
+                    return None
+                
+                # Xử lý trường images nếu có
+                if product.get('images'):
+                    try:
+                        import json
+                        images_list = json.loads(product['images'])
+                        # Lấy ảnh đầu tiên nếu có
+                        if images_list and len(images_list) > 0:
+                            product['image_url'] = images_list[0]
+                    except Exception as e:
+                        logger.warning(f"Không thể parse trường images: {e}")
+                
+                # Sử dụng trường image nếu không có images
+                if not product.get('image_url') and product.get('image'):
+                    product['image_url'] = product['image']
+                
+                return product
+                
+        except Exception as e:
+            logger.error(f"Error getting product details by ID {product_id}: {str(e)}")
+            # Thử kết nối lại nếu mất kết nối
+            self.connect()
+            return None
     
     def get_all_products(self) -> List[Dict]:
         """
