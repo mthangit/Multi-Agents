@@ -30,6 +30,9 @@ const ProductDetails = () => {
   const [loading, setLoading] = useState(false);
   const product = getProductById(productId);
 
+  // Sử dụng image_url nếu có, fallback sang image
+  const productImage = product?.image_url || product?.image;
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -49,8 +52,8 @@ const ProductDetails = () => {
         <main className="grid grid-rows-1 sm:grid-cols-2 gap-2 sm:gap-10 ">
           <section className="relative p-7 bg-black/[0.075]  flex items-center justify-center rounded-lg">
             <img
-              src={product?.image}
-              alt=""
+              src={productImage}
+              alt={product?.name || "Product"}
               className="w-full object-contain max-w-xs"
             />
           </section>

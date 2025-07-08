@@ -7,12 +7,13 @@ import bannerImg3 from "../assets/4.jpg";
 import handleRightImg from "../assets/ico-handleRight.png";
 import handleLeftImg from "../assets/ico-handleLeft.png";
 
-import { Filters, SingleProduct, SortBy } from "../components";
+import { Filters, SingleProduct, SortBy, Pagination } from "../components";
 
 import { useProductsContext } from "../contexts";
 import { useEffect, useState } from "react";
 import { useFilter } from "../hooks/filtersHook";
 import { useLocation } from "react-router";
+import { getProductsPaginatedService } from "../api/apiServices";
 
 const ProductListing = () => {
   const bannerImages = [bannerImg1, bannerImg2, bannerImg3];
@@ -32,9 +33,50 @@ const ProductListing = () => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [showScrollArrow, setShowScrollArrow] = useState(false);
 
-  const { loading } = useProductsContext();
-  const productsList = useFilter();
-  // console.log("Filtered Products:", productsList);
+  // States cho phân trang
+  const [paginatedProducts, setPaginatedProducts] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("");
+
+  const productsPerPage = 16; // Hiển thị 16 sản phẩm mỗi trang (4x4 grid)
+
+  // Load sản phẩm với phân trang
+  const loadProducts = async (page = 1, search = "", category = "", brand = "") => {
+    try {
+      setLoading(true);
+      const response = await getProductsPaginatedService(page, productsPerPage, search, category, brand);
+      
+      if (response.status === 200) {
+        setPaginatedProducts(response.data.products || []);
+        setPagination(response.data.pagination);
+      }
+    } catch (error) {
+      console.error("Lỗi khi load sản phẩm:", error);
+      setPaginatedProducts([]);
+      setPagination(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load sản phẩm lần đầu
+  useEffect(() => {
+    loadProducts(currentPage, searchTerm, selectedCategory, selectedBrand);
+  }, [currentPage, searchTerm, selectedCategory, selectedBrand]);
+
+  // Xử lý thay đổi trang
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    // Scroll lên đầu trang khi chuyển trang
+    window.scrollTo({
+      top: 0,
+      behavior: "smooth",
+    });
+  };
 
   useEffect(() => {
     const intervalTimer = setInterval(() => {
@@ -58,6 +100,7 @@ const ProductListing = () => {
       behavior: "smooth",
     });
   };
+  
   useEffect(() => {
     const toggleShowArrow = () => {
       if (window.scrollY > 300) {
@@ -104,7 +147,14 @@ const ProductListing = () => {
           </header>
 
           <section className="py-3 flex flex-col md:flex-row gap-2 justify-between">
-            <h1 className="text-2xl font-bold">Kính</h1>
+            <h1 className="text-2xl font-bold">
+              Kính
+              {pagination && (
+                <span className="text-lg text-gray-600 ml-2">
+                  ({pagination.total_items} sản phẩm)
+                </span>
+              )}
+            </h1>
             <div className="flex items-center gap-2">
               <Filters
                 isFilterOpen={isFilterOpen}
@@ -123,15 +173,28 @@ const ProductListing = () => {
             </div>
           </section>
 
-          {productsList.length > 0 ? (
-            <main className="relative grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
-              {productsList.map((glass) => (
-                <SingleProduct key={glass.id} product={glass} />
-              ))}
-            </main>
+          {paginatedProducts.length > 0 ? (
+            <>
+              <main className="relative grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+                {paginatedProducts.map((glass) => (
+                  <SingleProduct key={glass.id} product={glass} />
+                ))}
+              </main>
+              
+              {/* Component phân trang */}
+              {pagination && (
+                <Pagination
+                  currentPage={pagination.current_page}
+                  totalPages={pagination.total_pages}
+                  onPageChange={handlePageChange}
+                  hasNext={pagination.has_next}
+                  hasPrev={pagination.has_prev}
+                />
+              )}
+            </>
           ) : (
             <p className="font-sans text-4xl  font-bold uppercase  tracking-wide text-gray-300 text-center w-full py-32">
-              Chưa load dữ liệu
+              Không tìm thấy sản phẩm nào
             </p>
           )}
 

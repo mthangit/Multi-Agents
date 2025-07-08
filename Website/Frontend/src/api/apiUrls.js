@@ -1,4 +1,4 @@
-const baseUrl = "http://34.87.90.190:8000/api";
+const baseUrl = "https://eyevi-backend.devsecopstech.click";
 
 //auth url
 export const SIGNUP_URL = `${baseUrl}/signup`;
@@ -6,7 +6,8 @@ export const LOGIN_URL = `${baseUrl}/login`;
 
 //products url
 
-export const PRODUCTS_URL = `${baseUrl}/products`;
+export const PRODUCTS_URL = `${baseUrl}/all-products/paginated?page=5&limit=26`;
+export const PRODUCTS_PAGINATED_URL = `${baseUrl}/all-products/paginated`;
 
 //category url
 export const CATEGORIES_URL = `${baseUrl}/categories`;

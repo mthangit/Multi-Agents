@@ -2,6 +2,7 @@ import axios from "axios";
 import {
   CART_URL,
   PRODUCTS_URL,
+  PRODUCTS_PAGINATED_URL,
   LOGIN_URL,
   SIGNUP_URL,
   WISHLIST_URL,
@@ -25,6 +26,18 @@ export const getAllInvoicesDetailsService = (invoiceID) =>
   axios.get(`${ALL_INVOICE}/${invoiceID}`);
 
 export const getAllProductsService = () => axios.get(PRODUCTS_URL);
+
+export const getProductsPaginatedService = (page = 1, limit = 20, search = "", category = "", brand = "") => {
+  const params = new URLSearchParams();
+  params.append("page", page);
+  params.append("limit", limit);
+  
+  if (search) params.append("search", search);
+  if (category) params.append("category", category);
+  if (brand) params.append("brand", brand);
+  
+  return axios.get(`${PRODUCTS_PAGINATED_URL}?${params.toString()}`);
+};
 
 export const getProductByIdService = (productId) =>
   //axios.get(`http://34.87.90.190:8000/api/products/${productId}`);

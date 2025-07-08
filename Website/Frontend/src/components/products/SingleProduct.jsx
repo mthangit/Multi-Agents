@@ -19,6 +19,9 @@ const SingleProduct = ({ product }) => {
   const location = useLocation();
   let inCart = isInCart(product._id);
 
+  // Sử dụng image_url nếu có, fallback sang image
+  const productImage = product.image_url || product.image;
+
   return (
     <div
       className="flex flex-col xs:flex-row sm:flex-col  bg-white/[0.5] rounded-lg shadow-md border-2 border-black/[0.05] overflow-hidden
@@ -34,8 +37,8 @@ const SingleProduct = ({ product }) => {
         }}
       >
         <img
-          src={product.image}
-          alt=""
+          src={productImage}
+          alt={product.name || "Product"}
           className="w-full object-cover xs:object-contain sm:object-cover h-28"
         />
       </div>

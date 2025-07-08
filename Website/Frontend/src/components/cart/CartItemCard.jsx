@@ -27,6 +27,10 @@ const CartItemCard = ({ product, isSearch, setSearch }) => {
     }
   };
   const inWish = isInWish(product._id);
+
+  // Sử dụng image_url nếu có, fallback sang image
+  const productImage = product.image_url || product.image;
+
   return (
     <div
       className={`m-auto flex flex-col gap-2  p-4 rounded-sm shadow-sm bg-white/[0.6] mb-2 max-w-xl ${
@@ -46,7 +50,7 @@ const CartItemCard = ({ product, isSearch, setSearch }) => {
               isSearch ? "h-14 w-14 " : "h-28 w-28"
             } rounded-md flex items-center`}
           >
-            <img src={product.image} alt="" className="object-fit w-full" />
+            <img src={productImage} alt={product.name || "Product"} className="object-fit w-full" />
           </div>
           <div className="flex flex-col gap-3">
             <h2 className="text-xl py-3 font-semibold">{product.name}</h2>
