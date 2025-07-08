@@ -142,6 +142,128 @@ class DatabaseConnector:
             logger.error(f"Error getting all products: {str(e)}")
             self.connect()
             return []
+    
+    def get_products_paginated(self, page: int = 1, limit: int = 20, search: str = None, category: str = None, brand: str = None) -> Dict:
+        """
+        Lấy sản phẩm có phân trang với các filter tùy chọn
+        
+        Args:
+            page: Trang hiện tại (bắt đầu từ 1)
+            limit: Số sản phẩm mỗi trang (tối đa 100)
+            search: Tìm kiếm theo tên sản phẩm
+            category: Lọc theo danh mục
+            brand: Lọc theo thương hiệu
+            
+        Returns:
+            Dict chứa products, pagination info
+        """
+        try:
+            # Giới hạn limit tối đa
+            limit = min(limit, 100)
+            offset = (page - 1) * limit
+            
+            conn = self.get_connection()
+            with conn.cursor() as cursor:
+                # Xây dựng WHERE clause
+                where_conditions = []
+                params = []
+                
+                if search:
+                    where_conditions.append("name LIKE %s")
+                    params.append(f"%{search}%")
+                
+                if category:
+                    where_conditions.append("category = %s")
+                    params.append(category)
+                    
+                if brand:
+                    where_conditions.append("brand = %s")
+                    params.append(brand)
+                
+                where_clause = ""
+                if where_conditions:
+                    where_clause = "WHERE " + " AND ".join(where_conditions)
+                
+                # Query để đếm tổng số sản phẩm
+                count_query = f"SELECT COUNT(*) as total FROM products {where_clause}"
+                cursor.execute(count_query, params)
+                total_count = cursor.fetchone()['total']
+                
+                # Query để lấy sản phẩm với phân trang
+                products_query = f"""
+                SELECT id, name, description, brand, category, gender, weight, 
+                       quantity, images, rating, newPrice, trending, frameMaterial, 
+                       lensMaterial, lensFeatures, frameShape, lensWidth, bridgeWidth, 
+                       templeLength, color, availability, price, image, stock
+                FROM products 
+                {where_clause}
+                ORDER BY id DESC
+                LIMIT %s OFFSET %s
+                """
+                
+                cursor.execute(products_query, params + [limit, offset])
+                products = cursor.fetchall()
+                
+                # Xử lý trường images cho mỗi sản phẩm
+                for product in products:
+                    if product.get('images'):
+                        try:
+                            import json
+                            images_list = json.loads(product['images'])
+                            if images_list and len(images_list) > 0:
+                                product['image_url'] = images_list[0]
+                        except Exception as e:
+                            logger.warning(f"Không thể parse trường images: {e}")
+                    
+                    # Sử dụng trường image nếu không có images
+                    if not product.get('image_url') and product.get('image'):
+                        product['image_url'] = product['image']
+                
+                # Tính toán thông tin phân trang
+                total_pages = (total_count + limit - 1) // limit  # Ceiling division
+                has_next = page < total_pages
+                has_prev = page > 1
+                
+                return {
+                    "products": products,
+                    "pagination": {
+                        "current_page": page,
+                        "per_page": limit,
+                        "total_items": total_count,
+                        "total_pages": total_pages,
+                        "has_next": has_next,
+                        "has_prev": has_prev,
+                        "next_page": page + 1 if has_next else None,
+                        "prev_page": page - 1 if has_prev else None
+                    },
+                    "filters": {
+                        "search": search,
+                        "category": category,
+                        "brand": brand
+                    }
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting paginated products: {str(e)}")
+            self.connect()
+            return {
+                "products": [],
+                "pagination": {
+                    "current_page": 1,
+                    "per_page": limit,
+                    "total_items": 0,
+                    "total_pages": 0,
+                    "has_next": False,
+                    "has_prev": False,
+                    "next_page": None,
+                    "prev_page": None
+                },
+                "filters": {
+                    "search": search,
+                    "category": category,
+                    "brand": brand
+                }
+            }
 
     def close(self):
         if self.connection and self.connection.open:

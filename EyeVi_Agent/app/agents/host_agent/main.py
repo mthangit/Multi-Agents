@@ -89,6 +89,26 @@ class ProductFullResponse(BaseModel):
     stock: Optional[int] = None
     image_url: Optional[str] = None  # URL ảnh được xử lý
 
+class PaginationInfo(BaseModel):
+    current_page: int
+    per_page: int
+    total_items: int
+    total_pages: int
+    has_next: bool
+    has_prev: bool
+    next_page: Optional[int] = None
+    prev_page: Optional[int] = None
+
+class FilterInfo(BaseModel):
+    search: Optional[str] = None
+    category: Optional[str] = None
+    brand: Optional[str] = None
+
+class PaginatedProductsResponse(BaseModel):
+    products: List[ProductFullResponse]
+    pagination: PaginationInfo
+    filters: FilterInfo
+
 @app.on_event("startup")
 async def startup_event():
     """Khởi tạo khi server start"""
@@ -279,6 +299,58 @@ async def get_all_products():
     except Exception as e:
         logger.error(f"❌ Lỗi khi lấy toàn bộ sản phẩm: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy toàn bộ sản phẩm: {str(e)}")
+
+@app.get("/products/paginated", response_model=PaginatedProductsResponse)
+async def get_products_paginated(
+    page: int = 1,
+    limit: int = 20,
+    search: Optional[str] = None,
+    category: Optional[str] = None,
+    brand: Optional[str] = None
+):
+    """
+    Lấy sản phẩm có phân trang với các filter tùy chọn
+    
+    Query Parameters:
+    - page: Trang hiện tại (mặc định 1)
+    - limit: Số sản phẩm mỗi trang (mặc định 20, tối đa 100)
+    - search: Tìm kiếm theo tên sản phẩm
+    - category: Lọc theo danh mục
+    - brand: Lọc theo thương hiệu
+    
+    Example: /products/paginated?page=1&limit=12&search=kính&category=Kính mát
+    """
+    try:
+        # Validate parameters
+        if page < 1:
+            raise HTTPException(status_code=400, detail="Trang phải >= 1")
+        
+        if limit < 1 or limit > 100:
+            raise HTTPException(status_code=400, detail="Limit phải từ 1-100")
+        
+        logger.info(f"🔍 Lấy sản phẩm trang {page}, limit {limit}, filters: search='{search}', category='{category}', brand='{brand}'")
+        
+        result = db_connector.get_products_paginated(
+            page=page,
+            limit=limit,
+            search=search,
+            category=category,
+            brand=brand
+        )
+        
+        logger.info(f"✅ Trả về {len(result['products'])} sản phẩm trang {page}/{result['pagination']['total_pages']}")
+        
+        return PaginatedProductsResponse(
+            products=result["products"],
+            pagination=PaginationInfo(**result["pagination"]),
+            filters=FilterInfo(**result["filters"])
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi lấy sản phẩm phân trang: {e}")
+        raise HTTPException(status_code=500, detail=f"Lỗi khi lấy sản phẩm phân trang: {str(e)}")
 
 @app.get("/agents/status")
 async def get_agents_status():
