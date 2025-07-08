@@ -54,11 +54,7 @@ const Footer = () => {
           <b>VỀ CHÚNG TÔI</b>
           <ul>
             <li>Nguyễn Dương</li>
-            <li>Nguyễn Duy Đạt</li>
-            <li>Nguyễn Phước Huy</li>
-            <li>Nguyễn Thị Tường Vi</li>
-            <li>Trần Hạnh Thảo</li>
-            <li>Lê Thuận Hiếu</li>
+            <li>Hoàng Mạnh Thắng</li>
           </ul>
         </li>
         <li className="flex-1">
