@@ -19,14 +19,14 @@ const CartItemCard = ({ product, isSearch, setSearch }) => {
   const updateHandler = (type) => {
     console.log("Type: ", type);
     if (type === "increment" && product.quantity > product.qty) {
-      updateProductQtyInCart(product._id, type);
+      updateProductQtyInCart(product.id, type);
     } else if (product.qty > 1) {
-      updateProductQtyInCart(product._id, type);
+      updateProductQtyInCart(product.id, type);
     } else {
-      deleteProductFromCart(product._id);
+      deleteProductFromCart(product.id);
     }
   };
-  const inWish = isInWish(product._id);
+  const inWish = isInWish(product.id);
 
   // Sử dụng image_url nếu có, fallback sang image
   const productImage = product.image_url || product.image;
@@ -39,7 +39,7 @@ const CartItemCard = ({ product, isSearch, setSearch }) => {
       onClick={() => {
         if (isSearch) {
           setSearch("");
-          navigate(`product/${product._id}`);
+          navigate(`product/${product.id}`);
         }
       }}
     >
@@ -81,7 +81,7 @@ const CartItemCard = ({ product, isSearch, setSearch }) => {
                   <button
                     className="btn-rounded-secondary  text-xs sm:text-sm mt-2 max-w-xs disabled:cursor-not-allowed"
                     disabled={disableCart}
-                    onClick={() => deleteProductFromCart(product._id)}
+                    onClick={() => deleteProductFromCart(product.id)}
                   >
                     Xóa sản phẩm
                   </button>
@@ -90,7 +90,7 @@ const CartItemCard = ({ product, isSearch, setSearch }) => {
                     disabled={disableWish}
                     onClick={() => {
                       if (inWish) {
-                        deleteProductFromWishlist(product._id);
+                        deleteProductFromWishlist(product.id);
                       } else {
                         addProductToWishlist(product);
                       }

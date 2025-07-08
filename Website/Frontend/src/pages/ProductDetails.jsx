@@ -24,11 +24,14 @@ const ProductDetails = () => {
   const { productId } = useParams();
   const { token } = useAuthContext();
   const { getProductById, allProducts } = useProductsContext();
+  
+  // Parse productId thành number nếu cần
+  const parsedProductId = isNaN(productId) ? productId : parseInt(productId);
   const { addProductToCart, disableCart } = useCartContext();
   const { addProductToWishlist, deleteProductFromWishlist, disableWish } =
     useWishlistContext();
   const [loading, setLoading] = useState(false);
-  const product = getProductById(productId);
+  const product = getProductById(parsedProductId);
 
   // Sử dụng image_url nếu có, fallback sang image
   const productImage = product?.image_url || product?.image;
@@ -118,7 +121,7 @@ const ProductDetails = () => {
               </span> */}
               <span className="text-gray-600 line-through text-sm">
                 {" "}
-                {new Intl.NumberFormat("vi-VN", {
+                {product?.price && new Intl.NumberFormat("vi-VN", {
                   style: "currency",
                   currency: "VND",
                 }).format(product.price)}
@@ -155,7 +158,7 @@ const ProductDetails = () => {
                     notify("warn", "Đăng nhập để tiếp tục");
                   } else {
                     if (product?.inWish) {
-                      deleteProductFromWishlist(product._id);
+                      deleteProductFromWishlist(product.id);
                     } else {
                       addProductToWishlist(product);
                     }

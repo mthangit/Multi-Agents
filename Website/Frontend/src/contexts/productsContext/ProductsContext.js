@@ -34,6 +34,10 @@ const ProductsContextProvider = ({ children }) => {
           const productsData = productsRes.data.products || []; // Kiểm tra dữ liệu
           console.log("productsData:", productsData); // Kiểm tra dữ liệu sau khi xử lý
 
+          // Lưu products vào localStorage để dùng sau
+          localStorage.setItem('allProducts', JSON.stringify(productsData));
+          console.log("✅ Đã lưu", productsData.length, "sản phẩm vào localStorage");
+
           const maxValue = productsData.reduce(
             (acc, { price }) => (acc > price ? acc : price),
             0
@@ -69,8 +73,26 @@ const ProductsContextProvider = ({ children }) => {
     })();
   }, [token]);
 
-  const getProductById = (productId) =>
-    state.allProducts.find((product) => product._id === productId);
+  const getProductById = (productId) => {
+    // Thử tìm trong state trước
+    let product = state.allProducts.find((product) => product.id === productId || product._id === productId);
+    
+    // Nếu không có trong state, thử lấy từ localStorage
+    if (!product) {
+      try {
+        const storedProducts = localStorage.getItem('allProducts');
+        if (storedProducts) {
+          const allProducts = JSON.parse(storedProducts);
+          product = allProducts.find((product) => product.id === productId || product._id === productId);
+          console.log("🔍 Tìm thấy sản phẩm từ localStorage:", product?.name);
+        }
+      } catch (error) {
+        console.error("Lỗi khi đọc localStorage:", error);
+      }
+    }
+    
+    return product;
+  };
 
   const updateInCartOrInWish = (productId, type, value) => {
     console.log("Product ID is receive:", productId);

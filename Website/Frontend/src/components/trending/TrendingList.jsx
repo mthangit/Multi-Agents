@@ -16,7 +16,7 @@ const TrendingList = () => {
       </section>
         
       {trendingProducts.map((product) => (
-        <TrendingCard key={product._id} product={product} />
+        <TrendingCard key={product.id} product={product} />
       ))}
     </section>
 

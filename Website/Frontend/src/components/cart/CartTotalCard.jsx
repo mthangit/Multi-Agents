@@ -13,7 +13,7 @@ const CartTotalCard = ({ cart }) => {
     <section className="md:col-span-1 py-7 px-7 rounded-md shadow-sm bg-white/[0.7] flex flex-col gap-6 w-full h-min">
       <h1 className="text-xl">Chi tiết giỏ hàng</h1>
       {cart.map((product) => (
-        <PriceCard key={product._id} product={product} />
+        <PriceCard key={product.id} product={product} />
       ))}
 
       <hr />

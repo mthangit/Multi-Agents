@@ -121,7 +121,7 @@ const ProductTable = () => {
             {currentProducts.map((product) => (
               <tr
                 className="bg-white border-b hover:bg-gray-50"
-                key={product._id}
+                key={product.id}
               >
                 <td align="center">{product.name}</td>
 

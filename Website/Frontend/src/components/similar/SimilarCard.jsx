@@ -6,7 +6,7 @@ const SimilarCard = ({ product }) => {
 
   return (
     <Link
-      to={`/product/${product._id}`}
+      to={`/product/${product.id}`}
       className="flex flex-col px-4 py-2 rounded-xl bg-black/[.06] cursor-pointer gap-3"
     >
       <div className="flex justify-between gap-3 xs:flex-wrap xs:justify-center sm:flex-nowrap sm:justify-between">

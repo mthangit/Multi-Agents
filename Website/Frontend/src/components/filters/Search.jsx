@@ -72,7 +72,7 @@ const Search = () => {
             </li>
           ) : filteredData.length ? (
             filteredData.map((product) => (
-              <li key={product._id} className="">
+              <li key={product.id} className="">
                 <CartItemCard
                   product={product}
                   isSearch={true}

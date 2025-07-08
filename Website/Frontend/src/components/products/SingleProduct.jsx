@@ -17,7 +17,7 @@ const SingleProduct = ({ product }) => {
     useWishlistContext();
   const navigate = useNavigate();
   const location = useLocation();
-  let inCart = isInCart(product._id);
+  let inCart = isInCart(product.id);
 
   // Sử dụng image_url nếu có, fallback sang image
   const productImage = product.image_url || product.image;
@@ -33,7 +33,7 @@ const SingleProduct = ({ product }) => {
         // className="flex items-center justify-center p-10 xs:p-5 sm:p-10 bg-black/[0.075] h-1/2 xs:h-full sm:h-1/2 xs:w-1/2 w-full sm:w-full"
         className="flex items-center justify-center p-10 xs:p-5 sm:p-10 bg-black/[0.075]  xs:w-1/2 w-full sm:w-full"
         onClick={() => {
-          navigate(`/product/${product._id}`);
+          navigate(`/product/${product.id}`);
         }}
       >
         <img
@@ -107,7 +107,7 @@ const SingleProduct = ({ product }) => {
                 notify("warn", "Đăng nhập để tiếp tục");
               } else {
                 if (product?.inWish) {
-                  deleteProductFromWishlist(product._id);
+                  deleteProductFromWishlist(product.id);
                 } else {
                   addProductToWishlist(product);
                 }

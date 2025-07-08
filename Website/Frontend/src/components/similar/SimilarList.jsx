@@ -16,7 +16,7 @@ const SimilarList = ({ currentProductCategory }) => {
       <h1 className=" text-2xl sm:text-4xl font-bold">Có thể bạn thích</h1>
       <div className="grid  grid-cols-1 xs:grid-cols-2 md:grid-cols-3   lg:grid-cols-4 gap-4  py-4 mt-10">
         {similarProducts?.map((product) => (
-          <SimilarCard key={product._id} product={product} />
+          <SimilarCard key={product.id} product={product} />
         ))}
       </div>
     </section>

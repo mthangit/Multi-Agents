@@ -55,7 +55,7 @@ const WishlistContextProvider = ({ children }) => {
           type: actionTypes.ADD_PRODUCT_TO_WISHLIST,
           payload: [{ ...product, inWish: true }, ...state.wishlist],
         });
-        updateInCartOrInWish(product._id, "inWish", true);
+        updateInCartOrInWish(product.id, "inWish", true);
       }
       notify("success", "Đã thêm sản phẩm vào Yêu thích");
     } catch (err) {

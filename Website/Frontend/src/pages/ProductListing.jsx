@@ -51,8 +51,32 @@ const ProductListing = () => {
       const response = await getProductsPaginatedService(page, productsPerPage, search, category, brand);
       
       if (response.status === 200) {
-        setPaginatedProducts(response.data.products || []);
+        const products = response.data.products || [];
+        setPaginatedProducts(products);
         setPagination(response.data.pagination);
+        
+        // Lưu thêm products từ trang này vào localStorage
+        if (products.length > 0) {
+          try {
+            const existingProducts = JSON.parse(localStorage.getItem('allProducts') || '[]');
+            
+            // Merge products mới với products đã có, tránh duplicate
+            const mergedProducts = [...existingProducts];
+            products.forEach(newProduct => {
+              const exists = existingProducts.some(existing => 
+                existing.id === newProduct.id || existing._id === newProduct._id
+              );
+              if (!exists) {
+                mergedProducts.push(newProduct);
+              }
+            });
+            
+            localStorage.setItem('allProducts', JSON.stringify(mergedProducts));
+            console.log("✅ Đã cập nhật localStorage với", products.length, "sản phẩm mới. Tổng:", mergedProducts.length);
+          } catch (error) {
+            console.error("Lỗi khi cập nhật localStorage:", error);
+          }
+        }
       }
     } catch (error) {
       console.error("Lỗi khi load sản phẩm:", error);
@@ -177,7 +201,7 @@ const ProductListing = () => {
             <>
               <main className="relative grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
                 {paginatedProducts.map((glass) => (
-                  <SingleProduct key={glass.id} product={glass} />
+                  <SingleProduct key={glass._id || glass.id} product={glass} />
                 ))}
               </main>
               

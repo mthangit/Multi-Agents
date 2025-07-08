@@ -67,8 +67,8 @@ const CartContextProvider = ({ children }) => {
           type: actionTypes.ADD_PRODUCT_TO_CART,
           payload: [{ ...product, qty: 1 }, ...state.cart],
         });
-        console.log("Product ID to be sent:", product._id);
-        updateInCartOrInWish(product._id, "inCart", true);
+        console.log("Product ID to be sent:", product.id);
+        updateInCartOrInWish(product.id, "inCart", true);
         notify("success", "Đã thêm sản phẩm vào giỏ hàng");
       }
 
@@ -100,7 +100,7 @@ const CartContextProvider = ({ children }) => {
           dispatch({
             type: actionTypes.UPDATE_PRODUCT_QTY_IN_CART,
             payload: state.cart.map((product) =>
-              product._id === productId
+              product.id === productId
                 ? { ...product, qty: product.qty + 1 }
                 : product
             ),
@@ -109,7 +109,7 @@ const CartContextProvider = ({ children }) => {
           dispatch({
             type: actionTypes.UPDATE_PRODUCT_QTY_IN_CART,
             payload: state.cart.map((product) =>
-              product._id === productId
+              product.id === productId
                 ? { ...product, qty: product.qty - 1 }
                 : product
             ),
