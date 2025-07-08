@@ -4,9 +4,9 @@ import { useAuthContext, useProductsContext } from "../contexts";
 import {
   AddressCard,
   AddressForm,
-  InvoiceDetails,
-  InvoiceList,
 } from "../components";
+import OrderList from "../components/orders/OrderList";
+import OrderDetails from "../components/orders/OrderDetails";
 import Address from "../components/address/Address";
 import { useNavigate } from "react-router-dom";
 
@@ -22,11 +22,11 @@ const Profile = () => {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const { logoutHandler, userInfo, token } = useAuthContext();
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
-  const handleSelectInvoice = (invoiceId) => {
-    setSelectedItem("invoice");
-    setSelectedInvoiceId(invoiceId);
+  const handleSelectOrder = (orderId) => {
+    setSelectedItem("order");
+    setSelectedOrderId(orderId);
   };
   const handleLogOut = () => {
     setLoggingOut(true);
@@ -37,7 +37,7 @@ const Profile = () => {
   };
 
   const handleGoBack = () => {
-    setSelectedInvoiceId(null);
+    setSelectedOrderId(null);
   };
 
   return (
@@ -65,25 +65,25 @@ const Profile = () => {
             Địa chỉ
           </button>
           <button
-            onClick={() => setSelectedItem("invoice")}
+            onClick={() => setSelectedItem("order")}
             className={`text-sm mb-3 ${
-              selectedItem === "invoice"
+              selectedItem === "order"
                 ? "bg-[--primary-text-color] text-white"
                 : "bg-gray-100"
             } p-5 shadow-sm transition-colors w-full text-left`}
           >
-            Hóa đơn
+            Đơn hàng
           </button>
         </div>
         <div className="flex-1 ml-4">
-          {selectedItem === "invoice" ? (
-            selectedInvoiceId ? (
-              <InvoiceDetails
-                invoiceId={selectedInvoiceId}
+          {selectedItem === "order" ? (
+            selectedOrderId ? (
+              <OrderDetails
+                orderId={selectedOrderId}
                 onGoBack={handleGoBack}
               />
             ) : (
-              <InvoiceList onSelectInvoice={handleSelectInvoice} />
+              <OrderList onSelectOrder={handleSelectOrder} userId={userDetails?.id || 1} />
             )
           ) : selectedItem === "profile" ? (
             <div className="flex flex-col gap-4 w-full p-5">

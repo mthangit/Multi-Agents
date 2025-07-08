@@ -1,37 +1,12 @@
-import { Cart, Wishlist, Checkout, Profile, Orders } from "../pages";
 import Invoice from "../pages/admin/invoice/Invoice";
 import Customer from "../pages/admin/customer/Customer";
 import Dashboard from "../pages/admin/dashboard/Dashboard";
 import Product from "../pages/admin/product/Product";
-import PaymentResult from "../components/checkout/PaymentResult";
 
-const privateRoutes = [
-  {
-    path: "/cart",
-    element: <Cart />,
-  },
-  {
-    path: "/wishlist",
-    element: <Wishlist />,
-  },
-  {
-    path: "/checkout",
-    element: <Checkout />,
-  },
-  {
-    path: "/orders",
-    element: <Orders />,
-  },
-  {
-    path: "/profile",
-    element: <Profile />,
-  },
-  {
-    path: "/payment-result",
-    element: <PaymentResult />,
-  },
-];
+// Không còn private routes nào - tất cả đã chuyển sang public
+const privateRoutes = [];
 
+// Chỉ giữ lại admin routes (có thể tùy chọn bỏ authentication sau)
 const adminRoutes = [
   {
     path: "/admininvoice",

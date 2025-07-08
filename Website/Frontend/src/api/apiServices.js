@@ -10,6 +10,9 @@ import {
   CHECKOUT_URL,
   ALL_USER,
   ALL_INVOICE,
+  ORDERS_URL,
+  USER_ORDERS_URL,
+  ORDER_DETAILS_URL,
 } from "./apiUrls";
 
 export const loginService = (email, password) =>
@@ -242,3 +245,13 @@ export const getAllAddressesService = async (token) => {
 
 export const postAddProduct = (product) =>
   axios.post(`http://34.87.90.190:8000/api/admin/addproduct`, { product });
+
+// === ORDERS API SERVICES (không cần token) ===
+
+export const getAllOrdersService = () => axios.get(ORDERS_URL);
+
+export const getUserOrdersService = (userId) => 
+  axios.get(`${USER_ORDERS_URL}/${userId}`);
+
+export const getOrderDetailsService = (orderId) => 
+  axios.get(`${ORDER_DETAILS_URL}/${orderId}/details`);

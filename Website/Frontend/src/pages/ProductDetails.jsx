@@ -53,7 +53,7 @@ const ProductDetails = () => {
     <div>
       <div className="md:min-h-[60vh] flex justify-center items-center pt-5 sm:pt-3 pb-2 relative">
         <main className="grid grid-rows-1 sm:grid-cols-2 gap-2 sm:gap-10 ">
-          <section className="relative p-7 bg-black/[0.075]  flex items-center justify-center rounded-lg">
+          <section className="relative p-7 bg-white  flex items-center justify-center rounded-lg">
             <img
               src={productImage}
               alt={product?.name || "Product"}
@@ -196,7 +196,7 @@ const ProductDetails = () => {
         <br />
         <h1 className=" text-2xl sm:text-4xl font-bold">Đánh giá sản phẩm</h1>
 
-        <div className="flex p-6 rounded-md shadow-sm bg-black/[0.05]">
+        <div className="flex p-6 rounded-md shadow-sm bg-white">
           <div>
             <b className="ms-1 text-xl sm:text-2xl text-blue-800">
               {product?.rating}

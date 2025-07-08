@@ -8,16 +8,8 @@ export { default as Filters } from "./filters/Filters";
 export { default as SortBy } from "./filters/SortBy";
 export { default as Search } from "./filters/Search";
 
-export { default as TrendingCard } from "./trending/TrendingCard";
-export { default as TrendingList } from "./trending/TrendingList";
-export { default as Trending } from "./trending/TrendingList";
-
 export { default as CategoryCard } from "./categories/CategoryCard";
 export { default as CategoryList } from "./categories/CategoryList";
-
-export { default as Similar } from "./similar/SimilarList";
-export { default as SimilarCard } from "./similar/SimilarCard";
-export { default as SimilarList } from "./similar/SimilarList";
 
 export { default as StarRating } from "./products/StarRating";
 
@@ -28,6 +20,14 @@ export { default as Banner } from "./banner/Banner";
 export { default as Footer } from "./footer/Footer";
 
 export { default as Pagination } from "./common/Pagination";
+
+export { default as TrendingCard } from "./trending/TrendingCard";
+export { default as TrendingList } from "./trending/TrendingList";
+export { default as Trending } from "./trending/TrendingList";
+
+export { default as Similar } from "./similar/SimilarList";
+export { default as SimilarCard } from "./similar/SimilarCard";
+export { default as SimilarList } from "./similar/SimilarList";
 
 export { default as CartItemCard } from "./cart/CartItemCard";
 export { default as CartTotalCard } from "./cart/CartTotalCard";
@@ -41,3 +41,5 @@ export { default as AddressForm } from "./address/AddressForm";
 
 export { default as InvoiceList } from "./invoices/InvoiceList";
 export { default as InvoiceDetails } from "./invoices/InvoiceDetails";
+export { default as OrderList } from "./orders/OrderList";
+export { default as OrderDetails } from "./orders/OrderDetails";

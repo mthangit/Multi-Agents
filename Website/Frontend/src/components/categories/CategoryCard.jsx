@@ -31,7 +31,7 @@ const CategoryCard = ({
 
   return (
     <section
-      className="flex flex-col items-center rounded-xl bg-black/[.06] cursor-pointer gap-3 relative overflow-hidden categoryContainer"
+      className="flex flex-col items-center rounded-xl bg-white cursor-pointer gap-3 relative overflow-hidden categoryContainer"
       onClick={clickHandler}
     >
       <img
