@@ -300,7 +300,7 @@ async def get_all_products():
         logger.error(f"❌ Lỗi khi lấy toàn bộ sản phẩm: {e}")
         raise HTTPException(status_code=500, detail=f"Lỗi khi lấy toàn bộ sản phẩm: {str(e)}")
 
-@app.get("/products/paginated", response_model=PaginatedProductsResponse)
+@app.get("/all-products/paginated", response_model=PaginatedProductsResponse)
 async def get_products_paginated(
     page: int = 1,
     limit: int = 20,
