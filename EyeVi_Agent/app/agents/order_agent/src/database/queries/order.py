@@ -44,7 +44,7 @@ class OrderQuery:
                 
                 # Lấy thông tin sản phẩm
                 cursor.execute(
-                    "SELECT id, name, price, stock FROM products WHERE id = %s",
+                    "SELECT id, name, newPrice as price, stock FROM products WHERE id = %s",
                     (product_id,)
                 )
                 product = cursor.fetchone()
@@ -220,7 +220,7 @@ class OrderQuery:
         """Kiểm tra tồn kho của sản phẩm"""
         cursor = self.db.cursor(dictionary=True)
         cursor.execute(
-            "SELECT id, name, stock, price FROM products WHERE id = %s",
+            "SELECT id, name, stock, newPrice as price FROM products WHERE id = %s",
             (product_id,)
         )
         product = cursor.fetchone()

@@ -14,34 +14,37 @@ class DatabaseConnector:
         self.user = os.getenv("MYSQL_USER", "root")
         self.password = os.getenv("MYSQL_PASSWORD", "123456")
         self.database = os.getenv("MYSQL_DATABASE", "eyevi_db")
-        self.connection = None
         
-        self.connect()
+        # Test connection ngay lập tức để đảm bảo config đúng
+        self._test_connection()
     
-    def connect(self):
+    def _test_connection(self):
+        """Test connection để đảm bảo config đúng"""
         try:
-            self.connection = pymysql.connect(
-                host=self.host,
-                port=self.port,
-                user=self.user,
-                password=self.password,
-                database=self.database,
-                cursorclass=DictCursor,
-                charset='utf8mb4'
-            )
-            logger.info(f"✅ Kết nối thành công đến MySQL database: {self.host}:{self.port}/{self.database}")
+            conn = self._create_fresh_connection()
+            logger.info(f"✅ Test connection thành công đến MySQL database: {self.host}:{self.port}/{self.database}")
+            conn.close()
         except Exception as e:
-            logger.error(f"❌ Lỗi kết nối database: {e}")
-            self.connection = None
+            logger.error(f"❌ Lỗi test connection database: {e}")
+            raise
     
-    def get_connection(self):
-        if self.connection is None or not self.connection.open:
-            self.connect()
-        return self.connection
+    def _create_fresh_connection(self):
+        """Tạo connection mới cho mỗi query để tránh transaction isolation issues"""
+        return pymysql.connect(
+            host=self.host,
+            port=self.port,
+            user=self.user,
+            password=self.password,
+            database=self.database,
+            cursorclass=DictCursor,
+            charset='utf8mb4',
+            autocommit=True  # Auto commit để đảm bảo luôn thấy data mới nhất
+        )
     
     def get_product_by_id(self, product_id: str) -> Optional[Dict]:
+        conn = None
         try:
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 cursor.execute("SELECT id, name, images, newPrice FROM products WHERE id = %s", (product_id,))
                 product = cursor.fetchone()
@@ -66,16 +69,18 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting product by ID {product_id}: {str(e)}")
-            # Thử kết nối lại nếu mất kết nối
-            self.connect()
             return None
+        finally:
+            if conn:
+                conn.close()
     
     def get_products_by_ids(self, product_ids: List[str]) -> List[Dict]:
         if not product_ids:
             return []
             
+        conn = None
         try:
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 placeholders = ', '.join(['%s'] * len(product_ids))
                 query = f"SELECT id, name, images, newPrice FROM products WHERE id IN ({placeholders})"
@@ -101,15 +106,18 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting products by IDs: {str(e)}")
-            self.connect()
             return []
+        finally:
+            if conn:
+                conn.close()
 
     def get_product_details_by_id(self, product_id: str) -> Optional[Dict]:
         """
         Lấy chi tiết đầy đủ của sản phẩm theo ID (tương tự get_all_products nhưng cho 1 sản phẩm)
         """
+        conn = None
         try:
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 query = """
                 SELECT id, name, description, brand, category, gender, weight, 
@@ -144,16 +152,18 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting product details by ID {product_id}: {str(e)}")
-            # Thử kết nối lại nếu mất kết nối
-            self.connect()
             return None
+        finally:
+            if conn:
+                conn.close()
     
     def get_all_products(self) -> List[Dict]:
         """
         Lấy toàn bộ sản phẩm từ database với tất cả các trường
         """
+        conn = None
         try:
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 query = """
                 SELECT id, name, description, brand, category, gender, weight, 
@@ -184,8 +194,10 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting all products: {str(e)}")
-            self.connect()
             return []
+        finally:
+            if conn:
+                conn.close()
     
     def get_products_paginated(self, page: int = 1, limit: int = 20, search: str = None, category: str = None, brand: str = None) -> Dict:
         """
@@ -201,12 +213,13 @@ class DatabaseConnector:
         Returns:
             Dict chứa products, pagination info
         """
+        conn = None
         try:
             # Giới hạn limit tối đa
             limit = min(limit, 100)
             offset = (page - 1) * limit
             
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 # Xây dựng WHERE clause
                 where_conditions = []
@@ -289,7 +302,6 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting paginated products: {str(e)}")
-            self.connect()
             return {
                 "products": [],
                 "pagination": {
@@ -308,13 +320,17 @@ class DatabaseConnector:
                     "brand": brand
                 }
             }
+        finally:
+            if conn:
+                conn.close()
 
     def get_all_orders(self) -> List[Dict]:
         """
         Lấy tất cả đơn hàng từ bảng orders
         """
+        conn = None
         try:
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 query = """
                 SELECT id, user_id, total_items, total_price, actual_price, 
@@ -336,15 +352,18 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting all orders: {str(e)}")
-            self.connect()
             return []
+        finally:
+            if conn:
+                conn.close()
     
     def get_orders_by_user(self, user_id: int) -> List[Dict]:
         """
         Lấy đơn hàng theo user_id
         """
+        conn = None
         try:
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 query = """
                 SELECT id, user_id, total_items, total_price, actual_price, 
@@ -367,15 +386,18 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting orders for user {user_id}: {str(e)}")
-            self.connect()
             return []
+        finally:
+            if conn:
+                conn.close()
     
     def get_order_details(self, order_id: int) -> Dict:
         """
         Lấy chi tiết đơn hàng bao gồm thông tin sản phẩm
         """
+        conn = None
         try:
-            conn = self.get_connection()
+            conn = self._create_fresh_connection()
             with conn.cursor() as cursor:
                 # Lấy thông tin đơn hàng
                 order_query = """
@@ -436,13 +458,14 @@ class DatabaseConnector:
                 
         except Exception as e:
             logger.error(f"Error getting order details for order {order_id}: {str(e)}")
-            self.connect()
             return None
+        finally:
+            if conn:
+                conn.close()
 
     def close(self):
-        if self.connection and self.connection.open:
-            self.connection.close()
-            logger.info("Database connection closed")
+        """Close method for compatibility - không còn connection persistent nữa"""
+        logger.info("DatabaseConnector sử dụng fresh connections - không cần close")
 
 # Singleton instance
 db_connector = DatabaseConnector() 

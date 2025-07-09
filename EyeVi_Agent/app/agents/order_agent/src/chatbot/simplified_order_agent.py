@@ -245,9 +245,9 @@ def collect_order_info(user_id: int, product_items: str) -> str:
             stock = product.get('stock', 0)
             if stock < quantity:
                 return f"❌ Sản phẩm '{product.get('name')}' chỉ còn {stock} sản phẩm, không đủ cho số lượng {quantity}!"
-            
+             
             # Tính tiền
-            price = product.get('price', 0)
+            price = product.get('newPrice', 0)
             subtotal = price * quantity
             total_estimated += subtotal
             validated_items.append(item)
@@ -342,7 +342,7 @@ def create_order_directly(user_id: int, product_items: str, shipping_address: st
         order = OrderQuery().get_order_by_id(order_id)
         
         # Tính tổng tiền để hiển thị
-        total_estimated = sum(item.get('price', 0) * item.get('quantity', 1) for item in order.get('items', []))
+        total_estimated = sum(item.get('newPrice', 0) * item.get('quantity', 1) for item in order.get('items', []))
         
         # Text hiển thị cho user
         display_text = f"""✅ **ĐƠN HÀNG ĐƯỢC TẠO THÀNH CÔNG!**
@@ -566,26 +566,18 @@ class SimplifiedOrderAgent:
    ⚠️ **QUY TẮC QUAN TRỌNG:** MỌI ĐƠN HÀNG ĐỀU PHẢI HỎI THÔNG TIN ĐẦY ĐỦ!
    
    BƯỚC 1: collect_order_info(user_id, product_items)
-   - Thu thập thông tin sản phẩm và hiển thị tổng tiền
-   - YÊU CẦU user cung cấp: địa chỉ, số điện thoại, hình thức thanh toán
-   - KHÔNG được tự động lấy từ thông tin user cũ
+   - YÊU CẦU user cung cấp: số lượng sản phẩm, địa chỉ, số điện thoại, hình thức thanh toán
    
    BƯỚC 2: create_order_directly(user_id, product_items, shipping_address, phone, payment_method) 
    - CHỈ gọi SAU KHI user đã cung cấp đầy đủ thông tin
-   - Tất cả thông tin đều BẮT BUỘC: shipping_address, phone, payment_method
+   - Tất cả thông tin đều BẮT BUỘC: product_items, shipping_address, phone, payment_method
    - Hình thức thanh toán CHỈ chấp nhận: "COD" hoặc "Banking"
-   
-   ⚠️ QUAN TRỌNG:
-   - KHÔNG BAO GIỜ bỏ qua bước thu thập thông tin
-   - LUÔN hỏi đầy đủ: địa chỉ + số điện thoại + hình thức thanh toán
-   - KHÔNG sử dụng thông tin cũ từ profile user
-   - KHÔNG tự động đặt giá trị mặc định cho địa chỉ/phone
-   
+      
    Ví dụ flow đúng:
    User: "đặt 2 sản phẩm ID 1"
    → Gọi collect_order_info(1, '[{"product_id": 1, "quantity": 2}]')
-   → Hệ thống hỏi: địa chỉ, SĐT, hình thức thanh toán
-   User: "Giao 123 Nguyễn Trãi, SĐT 0901234567, thanh toán COD"
+   → Hệ thống hỏi: số lượng sản phẩm, địa chỉ, SĐT, hình thức thanh toán
+   User: "Mua 1 sản phẩm, giao đến 123 Nguyễn Trãi, SĐT 0901234567, thanh toán COD"
    → Gọi create_order_directly(1, '[{"product_id": 1, "quantity": 2}]', "123 Nguyễn Trãi", "0901234567", "COD")
 
 5. 🔄 CẬP NHẬT ĐƠN HÀNG:

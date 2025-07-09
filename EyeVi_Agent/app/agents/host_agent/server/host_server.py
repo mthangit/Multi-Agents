@@ -18,7 +18,7 @@ from prompt.root_prompt import ROOT_INSTRUCTION
 from .a2a_client_manager import A2AClientManager
 from .langchain_memory_adapter import EnhancedMemoryManager
 from .mysql_message_history import MySQLMessageHistory
-
+from db_connector import db_connector
 logger = logging.getLogger(__name__)
 
 class HostServer:
@@ -37,9 +37,9 @@ class HostServer:
         # MySQL Message History cho real-time logging
         self.mysql_history = MySQLMessageHistory()
         
-        # Database Connector để query thông tin sản phẩm
-        from db_connector import DatabaseConnector
-        self.db_connector = DatabaseConnector()
+        # Database Connector để query thông tin sản phẩm  
+        
+        self.db_connector = db_connector
 
     async def initialize(self):
         """Khởi tạo các components cần thiết"""
@@ -58,13 +58,8 @@ class HostServer:
             # Setup orchestrator chain
             await self._setup_orchestrator_chain()
             
-            # Khởi tạo Database Connector
-            try:
-                self.db_connector.connect()
-                logger.info("✅ Database Connector initialized")
-            except Exception as e:
-                logger.warning(f"⚠️ Database Connector failed to initialize: {e}")
-                logger.warning("📝 Product enrichment with images will be disabled")
+            # Database Connector đã được khởi tạo với fresh connection pattern
+            logger.info("✅ Database Connector (singleton) với fresh connections đã sẵn sàng")
             
             # Khởi tạo A2A Client Manager
             await self.a2a_client_manager.initialize()
@@ -998,10 +993,9 @@ class HostServer:
             if self.mysql_history:
                 await self.mysql_history.cleanup()
             
-            # Cleanup Database Connector
-            if self.db_connector:
-                self.db_connector.close()
-                logger.info("✅ Database Connector cleanup completed")
+            # Database Connector (singleton) sẽ được cleanup bởi main.py
+            # Không close connection ở đây để tránh ảnh hưởng đến các component khác
+            logger.info("✅ Database Connector (singleton) will be cleaned up by main.py")
             
             logger.info("✅ Host Server cleanup completed")
         except Exception as e:
