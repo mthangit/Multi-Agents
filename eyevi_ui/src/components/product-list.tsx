@@ -54,11 +54,31 @@ const ProductList: React.FC<ProductListProps> = ({
   const [displayCount, setDisplayCount] = useState(initialDisplay);
   const [isExpanded, setIsExpanded] = useState(false);
   const { getProductsByIds } = useChatApi();
-  
+
   // Refs để theo dõi việc đã fetch dữ liệu hay chưa
   const hasFetchedIdsRef = useRef<boolean>(false);
   const hasFetchedMissingDetailsRef = useRef<boolean>(false);
   const processedProductIdsRef = useRef<Set<string>>(new Set());
+
+  // Sync với initialProducts khi props thay đổi
+  useEffect(() => {
+    console.log("ProductList props changed:", { initialProducts, productIds });
+
+    // Reset state khi initialProducts thay đổi
+    if (initialProducts !== undefined) {
+      setProducts(initialProducts);
+      // Reset refs khi có products mới
+      hasFetchedIdsRef.current = false;
+      hasFetchedMissingDetailsRef.current = false;
+      processedProductIdsRef.current.clear();
+    } else if (!productIds || productIds.length === 0) {
+      // Nếu không có initialProducts và không có productIds thì clear
+      setProducts([]);
+      hasFetchedIdsRef.current = false;
+      hasFetchedMissingDetailsRef.current = false;
+      processedProductIdsRef.current.clear();
+    }
+  }, [initialProducts, productIds]);
 
   // Xử lý logic hiển thị sản phẩm - lọc ra các sản phẩm hợp lệ
   const validProducts = products.filter(product =>
