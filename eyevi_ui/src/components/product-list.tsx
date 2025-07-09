@@ -60,13 +60,16 @@ const ProductList: React.FC<ProductListProps> = ({
   const hasFetchedMissingDetailsRef = useRef<boolean>(false);
   const processedProductIdsRef = useRef<Set<string>>(new Set());
 
-  // Xử lý logic hiển thị sản phẩm
-  const displayProducts = products.slice(0, displayCount);
-  const hasMoreProducts = products.length > displayCount;
-  const remainingProducts = products.length - displayCount;
+  // Xử lý logic hiển thị sản phẩm - lọc ra các sản phẩm hợp lệ
+  const validProducts = products.filter(product =>
+    product && (product.product_id || product.name) // Đảm bảo có ít nhất product_id hoặc name
+  );
+  const displayProducts = validProducts.slice(0, displayCount);
+  const hasMoreProducts = validProducts.length > displayCount;
+  const remainingProducts = validProducts.length - displayCount;
 
   const handleLoadMore = () => {
-    const newCount = Math.min(displayCount + loadMoreCount, products.length);
+    const newCount = Math.min(displayCount + loadMoreCount, validProducts.length);
     setDisplayCount(newCount);
     setIsExpanded(true);
   };
@@ -277,7 +280,7 @@ const ProductList: React.FC<ProductListProps> = ({
     );
   }
   
-  if (products.length === 0 && !loading) {
+  if (validProducts.length === 0 && !loading) {
     return null;
   }
   
@@ -287,14 +290,17 @@ const ProductList: React.FC<ProductListProps> = ({
       <div className="flex items-center gap-2 mb-3">
         <Package className="h-4 w-4 text-primary" />
         <span className="text-sm font-medium text-foreground">
-          Danh sách sản phẩm ({products.length})
+          Danh sách sản phẩm ({validProducts.length})
         </span>
       </div>
 
       {/* Danh sách sản phẩm */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {displayProducts.map((product) => (
-          <ProductCard key={product.product_id} product={product} />
+        {displayProducts.map((product, index) => (
+          <ProductCard
+            key={product.product_id || `product-${index}-${product.name || 'unknown'}`}
+            product={product}
+          />
         ))}
       </div>
 

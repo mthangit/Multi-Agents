@@ -40,7 +40,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({ onStartChat }) => {
             <Search className="w-8 h-8 text-primary mb-3" />
             <h3 className="font-semibold mb-2">Tìm kiếm thông minh</h3>
             <p className="text-sm text-muted-foreground text-center">
-              Tìm kiếm kính mắt theo nhu cầu, phong cách và ngân sách của bạn
+              Tìm kiếm kính mắt theo nhu cầu và phong cách của bạn
             </p>
           </div>
           
@@ -48,7 +48,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({ onStartChat }) => {
             <MessageCircle className="w-8 h-8 text-primary mb-3" />
             <h3 className="font-semibold mb-2">Tư vấn cá nhân</h3>
             <p className="text-sm text-muted-foreground text-center">
-              Nhận tư vấn chuyên nghiệp về sản phẩm phù hợp với khuôn mặt
+              Nhận tư vấn chuyên nghiệp về sức khoẻ về mắt
             </p>
           </div>
           
@@ -56,7 +56,7 @@ const WelcomeBanner: React.FC<WelcomeBannerProps> = ({ onStartChat }) => {
             <ShoppingBag className="w-8 h-8 text-primary mb-3" />
             <h3 className="font-semibold mb-2">Mua sắm dễ dàng</h3>
             <p className="text-sm text-muted-foreground text-center">
-              Đặt hàng nhanh chóng và theo dõi đơn hàng một cách tiện lợi
+              Đặt hàng nhanh chóng và theo dõi lịch sử đơn hàng một cách tiện lợi
             </p>
           </div>
         </div>

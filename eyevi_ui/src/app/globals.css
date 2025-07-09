@@ -93,3 +93,154 @@
     -webkit-line-clamp: 2;
   }
 }
+
+/* Custom markdown styling */
+@layer components {
+  .prose {
+    /* Sử dụng inherit để kế thừa màu từ parent */
+    color: inherit;
+  }
+
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4,
+  .prose h5,
+  .prose h6 {
+    color: inherit;
+    font-weight: 600;
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+  }
+
+  .prose h1:first-child,
+  .prose h2:first-child,
+  .prose h3:first-child {
+    margin-top: 0;
+  }
+
+  .prose p {
+    margin-bottom: 1em;
+    line-height: 1.6;
+    color: inherit;
+  }
+
+  .prose ul,
+  .prose ol {
+    margin-bottom: 1em;
+    padding-left: 1.5em;
+  }
+
+  .prose li {
+    margin-bottom: 0.25em;
+    color: inherit;
+  }
+
+  .prose strong {
+    font-weight: 600;
+    color: inherit;
+  }
+
+  .prose em {
+    font-style: italic;
+    color: inherit;
+  }
+
+  .prose code {
+    background-color: rgba(0, 0, 0, 0.1);
+    color: inherit;
+    padding: 0.125rem 0.375rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
+    border: 1px solid currentColor;
+    border-opacity: 0.2;
+  }
+
+  .dark .prose code {
+    background-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .prose pre {
+    background-color: rgba(0, 0, 0, 0.05);
+    color: inherit;
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin: 1em 0;
+    border: 1px solid currentColor;
+    border-opacity: 0.2;
+  }
+
+  .dark .prose pre {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  .prose pre code {
+    background-color: transparent;
+    padding: 0;
+    border-radius: 0;
+    font-size: 0.875rem;
+    border: none;
+  }
+
+  .prose blockquote {
+    border-left: 4px solid currentColor;
+    padding-left: 1rem;
+    margin: 1.5em 0;
+    font-style: italic;
+    opacity: 0.8;
+    background-color: currentColor;
+    background-opacity: 0.1;
+    padding: 1rem;
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
+
+  .prose a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-weight: 500;
+    opacity: 0.8;
+  }
+
+  .prose a:hover {
+    opacity: 1;
+  }
+
+  .prose hr {
+    border: none;
+    border-top: 1px solid currentColor;
+    opacity: 0.2;
+    margin: 2em 0;
+  }
+
+  .prose table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5em 0;
+    border: 1px solid currentColor;
+    border-opacity: 0.2;
+    border-radius: 0.5rem;
+    overflow: hidden;
+  }
+
+  .prose th,
+  .prose td {
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid currentColor;
+    border-opacity: 0.2;
+    color: inherit;
+  }
+
+  .prose th {
+    background-color: currentColor;
+    background-opacity: 0.1;
+    font-weight: 600;
+  }
+
+  .prose tr:last-child td {
+    border-bottom: none;
+  }
+}
