@@ -58,6 +58,24 @@ export interface ProductData {
   newPrice?: number;        // Giá mới dạng decimal/number (ưu tiên)
 }
 
+// Interface cho Order Item Data
+export interface OrderItemData {
+  id: number;
+  order_id: number;
+  product_id: number; // Thay đổi từ string sang number
+  quantity: number;
+  price: number; // Field name từ API
+  created_at: string;
+  updated_at: string;
+  product_name: string;
+  product_description?: string;
+  // Các field bổ sung có thể có từ API
+  product_image?: string;
+  product_brand?: string;
+  product_color?: string;
+  product_frameShape?: string;
+}
+
 // Interface cho Order Data
 export interface OrderData {
   id: number;
@@ -67,11 +85,13 @@ export interface OrderData {
   actual_price: number;
   shipping_address: string;
   phone: string;
+  payment?: string; // Thêm field payment
   order_status: string;
   created_at: string;
   updated_at: string;
   user_name: string;
   user_email: string;
+  items?: OrderItemData[]; // Thêm field items
 }
 
 export interface Message {

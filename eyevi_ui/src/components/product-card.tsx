@@ -234,10 +234,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct, prod
             </span>
           )}
         </div>
-        
+
         <h3 className="font-medium text-sm line-clamp-2 h-10" title={product.name}>
           {product.name || "Sản phẩm kính mắt"}
         </h3>
+
+        {/* Mã sản phẩm - hiển thị dưới title */}
+        <div className="text-xs text-muted-foreground">
+          <span className="font-normal">Mã SP:</span> <span className="font-mono">{product.product_id}</span>
+        </div>
         
         <div className="flex items-center gap-2 mt-1">
           {product.color && (

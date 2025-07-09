@@ -2,7 +2,7 @@
 
 import React from "react";
 import { OrderData } from "@/hooks/useChatApi";
-import { Package, MapPin, Phone, User, Calendar, DollarSign, ExternalLink } from "lucide-react";
+import { Package, MapPin, Phone, User, Calendar, ExternalLink } from "lucide-react";
 import { Button } from "./ui/button";
 import { cn } from "@/lib/utils";
 
@@ -117,13 +117,21 @@ const OrderCard: React.FC<OrderCardProps> = ({ order }) => {
           <span className="text-sm text-muted-foreground">Số lượng:</span>
           <span className="text-sm font-medium">{order.total_items} SP</span>
         </div>
-        
+
         <div className="flex justify-between items-center">
           <span className="text-sm text-muted-foreground">Thành tiền:</span>
           <span className="text-sm font-bold text-primary">
             {formatPrice(order.actual_price)}
           </span>
         </div>
+
+        {/* Phương thức thanh toán */}
+        {order.payment && (
+          <div className="flex justify-between items-center">
+            <span className="text-sm text-muted-foreground">Thanh toán:</span>
+            <span className="text-sm font-medium">{order.payment}</span>
+          </div>
+        )}
       </div>
 
       {/* Ngày tạo */}

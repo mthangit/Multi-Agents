@@ -289,34 +289,49 @@ const ChatContainer = forwardRef<ChatContainerRef>((_, ref) => {
     try {
       // Gửi tin nhắn đến API
       const response = await sendMessage(message, attachments);
-      console.log("API Response:", response);
-      
+
+      // Logic ưu tiên:
+      // 1. Nếu có orders → chỉ hiển thị orders
+      // 2. Nếu có data (products) → hiển thị data, không hiển thị extracted_product_ids
+      // 3. Nếu chỉ có extracted_product_ids → hiển thị extracted_product_ids
+      const hasOrders = response.orders && response.orders.length > 0;
+      const hasProducts = response.data && response.data.length > 0;
+      const hasExtractedIds = response.extracted_product_ids && response.extracted_product_ids.length > 0;
+
       // Xóa tin nhắn loading và thêm tin nhắn phản hồi từ API
       const botReply: ContainerMessage = {
         id: loadingMessageId,
         role: "assistant",
         content: response.response,
         timestamp: new Date().toISOString(),
-        products: response.data,
-        extracted_product_ids: response.extracted_product_ids,
-        orders: response.orders,
+        products: !hasOrders && hasProducts ? response.data : undefined,
+        extracted_product_ids: !hasOrders && !hasProducts && hasExtractedIds ? response.extracted_product_ids : undefined,
+        orders: hasOrders ? response.orders : undefined,
         agent_used: response.agent_used,
         is_loading: false,
       };
-      
-      setMessages((prev) => 
+
+      setMessages((prev) =>
         prev.map((msg) => (msg.id === loadingMessageId ? botReply : msg))
       );
       setLoadingMessageId(null);
-      
-      // Cập nhật danh sách sản phẩm nếu có
-      if (response.data && response.data.length > 0) {
-        setProducts(response.data);
-      }
-      
-      // Cập nhật danh sách ID sản phẩm nếu có
-      if (response.extracted_product_ids && response.extracted_product_ids.length > 0) {
-        setProductIds(response.extracted_product_ids);
+
+      // Logic ưu tiên state update:
+      // 1. Nếu có orders → clear products
+      // 2. Nếu có data (products) → set products, clear product IDs
+      // 3. Nếu chỉ có extracted_product_ids → set product IDs, clear products
+      if (hasOrders) {
+        setProducts([]); // Clear products khi có orders
+        setProductIds([]); // Clear product IDs khi có orders
+      } else if (hasProducts) {
+        setProducts(response.data!); // Set products khi có data
+        setProductIds([]); // Clear product IDs khi có products
+      } else if (hasExtractedIds) {
+        setProducts([]); // Clear products khi chỉ có extracted IDs
+        setProductIds(response.extracted_product_ids!); // Set product IDs
+      } else {
+        setProducts([]); // Clear tất cả nếu không có gì
+        setProductIds([]);
       }
     } catch (error) {
       console.error("Lỗi khi gửi tin nhắn:", error);
