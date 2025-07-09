@@ -188,7 +188,7 @@ def get_user_orders(user_id: int, limit: int = 5) -> str:
             result += f"""
 {i}. 🆔 Đơn #{order.get('id')} | 💰 {order.get('total_price', 0):,} VND
    📦 {order.get('total_items', 0)} sản phẩm | 📊 {order.get('order_status', 'N/A')}
-   📅 {order.get('created_at', 'N/A')}"""
+   💳 {order.get('payment', 'COD')} | 📅 {order.get('created_at', 'N/A')}"""
         
         # Data cho client xử lý
         data_dict = {
@@ -206,20 +206,17 @@ def get_user_orders(user_id: int, limit: int = 5) -> str:
         return f"❌ Lỗi: {str(e)}"
 
 @tool
-def create_order_directly(user_id: int, product_items: str, shipping_address: str = "", phone: str = "", payment_method: str = "COD") -> str:
+def collect_order_info(user_id: int, product_items: str) -> str:
     """
-    Create order directly with product list
+    Thu thập thông tin cần thiết để tạo đơn hàng (bước 1)
     Args:
         user_id: ID người dùng
         product_items: Danh sách sản phẩm dạng JSON string: [{"product_id": 1, "quantity": 2}, ...]
-        shipping_address: Địa chỉ giao hàng (nếu trống sẽ lấy từ thông tin user)
-        phone: Số điện thoại liên lạc (nếu trống sẽ lấy từ thông tin user)
-        payment_method: Phương thức thanh toán (COD, Bank Transfer, Credit Card)
     Returns:
-        Kết quả tạo đơn hàng dạng string kèm data JSON
+        Thông tin sản phẩm và yêu cầu thông tin giao hàng
     """
     try:
-        logger.info(f"🛍️ Tạo đơn hàng trực tiếp cho user {user_id}")
+        logger.info(f"📋 Thu thập thông tin đặt hàng cho user {user_id}")
         
         # Parse danh sách sản phẩm
         try:
@@ -229,12 +226,11 @@ def create_order_directly(user_id: int, product_items: str, shipping_address: st
         if not items:
             return "❌ Danh sách sản phẩm trống!"
         
-        # BƯỚC 1: QUERY THÔNG TIN SẢN PHẨM TRƯỚC KHI TẠO ĐƠN
-        logger.info("🔍 Kiểm tra thông tin sản phẩm trước khi tạo đơn...")
+        # Kiểm tra thông tin sản phẩm và tồn kho
         product_query = ProductQuery()
-        validated_items = []
+        order_summary = "📋 **XÁC NHẬN ĐƠN HÀNG:**\n\n"
         total_estimated = 0
-        order_summary = "📋 **THÔNG TIN ĐƠN HÀNG:**\n\n"
+        validated_items = []
         
         for item in items:
             product_id = item.get('product_id')
@@ -254,8 +250,6 @@ def create_order_directly(user_id: int, product_items: str, shipping_address: st
             price = product.get('price', 0)
             subtotal = price * quantity
             total_estimated += subtotal
-            
-            # Thêm vào danh sách đã validate
             validated_items.append(item)
             
             # Thêm vào summary
@@ -263,33 +257,102 @@ def create_order_directly(user_id: int, product_items: str, shipping_address: st
             order_summary += f"   💰 {price:,} VND x {quantity} = {subtotal:,} VND\n"
             order_summary += f"   📊 Tồn kho: {stock} sản phẩm\n\n"
         
-        order_summary += f"💰 **TỔNG TIỀN ƯỚC TÍNH: {total_estimated:,} VND**\n\n"
+        order_summary += f"💰 **TỔNG TIỀN: {total_estimated:,} VND**\n\n"
         
-        # BƯỚC 2: TẠO ĐƠN HÀNG SAU KHI VALIDATE
-        logger.info("✅ Tất cả sản phẩm hợp lệ, tiến hành tạo đơn hàng...")
+        # Yêu cầu thông tin giao hàng
+        order_summary += """🚨 **CẦN THÔNG TIN GIAO HÀNG:**
+
+Để hoàn tất đơn hàng, vui lòng cung cấp:
+📍 **Địa chỉ giao hàng**: Ví dụ: "123 Nguyễn Trãi, Quận 1, TP.HCM"
+📞 **Số điện thoại**: Ví dụ: "0901234567"
+💳 **Hình thức thanh toán**: 
+   - "COD" (Thanh toán khi nhận hàng)
+   - "Banking" (Chuyển khoản ngân hàng)
+
+📝 **Ví dụ trả lời:** "Giao đến 123 Nguyễn Trãi, TP.HCM, số điện thoại 0901234567, thanh toán COD"
+"""
+        
+        # Data cho client xử lý
+        data_dict = {
+            "type": "order_info_request",
+            "data": {
+                "items": validated_items,
+                "estimated_total": total_estimated,
+                "user_id": user_id,
+                "products_info": [product_query.get_product_by_id(item['product_id']) for item in validated_items]
+            }
+        }
+        
+        return f"{order_summary}\n\n[DATA_MARKER]{safe_json_dumps(data_dict)}[/DATA_MARKER]"
+        
+    except Exception as e:
+        logger.error(f"Lỗi thu thập thông tin đặt hàng user {user_id}: {e}")
+        return f"❌ Lỗi: {str(e)}"
+
+@tool
+def create_order_directly(user_id: int, product_items: str, shipping_address: str, phone: str, payment_method: str) -> str:
+    """
+    Tạo đơn hàng với thông tin đầy đủ (bước 2 - sau khi đã thu thập thông tin)
+    Args:
+        user_id: ID người dùng
+        product_items: Danh sách sản phẩm dạng JSON string: [{"product_id": 1, "quantity": 2}, ...]
+        shipping_address: Địa chỉ giao hàng (BẮT BUỘC)
+        phone: Số điện thoại liên lạc (BẮT BUỘC)
+        payment_method: Phương thức thanh toán (COD hoặc Banking - BẮT BUỘC)
+    Returns:
+        Kết quả tạo đơn hàng dạng string kèm data JSON
+    """
+    try:
+        logger.info(f"🛍️ Tạo đơn hàng với thông tin đầy đủ cho user {user_id}")
+        
+        # Kiểm tra thông tin bắt buộc
+        if not shipping_address or not shipping_address.strip():
+            return "❌ Thiếu địa chỉ giao hàng! Vui lòng cung cấp địa chỉ giao hàng."
+        
+        if not phone or not phone.strip():
+            return "❌ Thiếu số điện thoại! Vui lòng cung cấp số điện thoại liên lạc."
+        
+        # Kiểm tra phương thức thanh toán hợp lệ
+        valid_payment_methods = ["COD", "Banking"]
+        if not payment_method or payment_method not in valid_payment_methods:
+            return f"❌ Phương thức thanh toán không hợp lệ! Chỉ chấp nhận: {', '.join(valid_payment_methods)}"
+        
+        # Parse danh sách sản phẩm
+        try:
+            items = json.loads(product_items)
+        except json.JSONDecodeError:
+            return "❌ Danh sách sản phẩm không đúng định dạng JSON"
+        if not items:
+            return "❌ Danh sách sản phẩm trống!"
+        
+        # TẠO ĐƠN HÀNG VỚI THÔNG TIN ĐÃ VALIDATE
+        logger.info("🛍️ Tạo đơn hàng với thông tin đầy đủ...")
         order_id = OrderQuery().create_order(
             user_id=user_id,
-            items=validated_items,
-            shipping_address=shipping_address,
-            phone=phone,
+            items=items,
+            shipping_address=shipping_address.strip(),
+            phone=phone.strip(),
             payment_method=payment_method
         )
         
         if not order_id:
             return "❌ Không thể tạo đơn hàng. Vui lòng thử lại."
         
-        # BƯỚC 3: LẤY THÔNG TIN ĐƠN HÀNG ĐÃ TẠO
+        # LẤY THÔNG TIN ĐƠN HÀNG ĐÃ TẠO
         order = OrderQuery().get_order_by_id(order_id)
         
+        # Tính tổng tiền để hiển thị
+        total_estimated = sum(item.get('price', 0) * item.get('quantity', 1) for item in order.get('items', []))
+        
         # Text hiển thị cho user
-        display_text = f"""{order_summary}✅ **ĐƠN HÀNG ĐƯỢC TẠO THÀNH CÔNG!**
+        display_text = f"""✅ **ĐƠN HÀNG ĐƯỢC TẠO THÀNH CÔNG!**
 
 🆔 Mã đơn hàng: #{order_id}
-💰 Tổng tiền thực tế: {order.get('total_price', 0):,} VND
+💰 Tổng tiền: {order.get('total_price', 0):,} VND
 📦 Tổng số sản phẩm: {order.get('total_items', 0)}
 🚚 Địa chỉ giao hàng: {order.get('shipping_address', 'N/A')}
 📞 Số điện thoại: {order.get('phone', 'N/A')}
-💳 Phương thức thanh toán: {payment_method}
+💳 Phương thức thanh toán: {order.get('payment', 'COD')}
 📊 Trạng thái: {order.get('order_status', 'pending')}
 
 🎉 Cảm ơn bạn đã đặt hàng! Đơn hàng sẽ được xử lý trong thời gian sớm nhất."""
@@ -299,7 +362,7 @@ def create_order_directly(user_id: int, product_items: str, shipping_address: st
             "type": "order_created",
             "data": {
                 "order": order,
-                "items": validated_items,
+                "items": items,
                 "estimated_total": total_estimated
             }
         }
@@ -319,12 +382,18 @@ def update_order_info(order_id: int, shipping_address: str, phone: str, payment_
         order_id: ID đơn hàng cần cập nhật
         shipping_address: Địa chỉ giao hàng mới
         phone: Số điện thoại liên lạc mới
-        payment_method: Phương thức thanh toán mới
+        payment_method: Phương thức thanh toán mới (COD hoặc Banking)
     Returns:
         Kết quả cập nhật đơn hàng dạng string kèm data JSON
     """
     try:
         logger.info(f"🔄 Cập nhật thông tin đơn hàng ID: {order_id}")
+        
+        # Kiểm tra phương thức thanh toán hợp lệ
+        valid_payment_methods = ["COD", "Banking"]
+        if payment_method not in valid_payment_methods:
+            return f"❌ Phương thức thanh toán không hợp lệ! Chỉ chấp nhận: {', '.join(valid_payment_methods)}"
+        
         order = OrderQuery().get_order_by_id(order_id)
         if not order:
             return f"❌ Đơn hàng ID {order_id} không tồn tại!"
@@ -345,10 +414,10 @@ def update_order_info(order_id: int, shipping_address: str, phone: str, payment_
 
 📋 **THÔNG TIN ĐƠN HÀNG MỚI:**
 🆔 Mã đơn hàng: #{order_id}
-📊 Trạng thái: {order.get('order_status', 'pending')}
-🚚 Địa chỉ giao hàng: {shipping_address}
-📞 Số điện thoại: {phone}
-💳 Phương thức thanh toán: {payment_method}"""
+📊 Trạng thái: {updated_order.get('order_status', 'pending')}
+🚚 Địa chỉ giao hàng: {updated_order.get('shipping_address', 'N/A')}
+📞 Số điện thoại: {updated_order.get('phone', 'N/A')}
+💳 Phương thức thanh toán: {updated_order.get('payment', 'COD')}"""
         
         # Data cho client xử lý
         data_dict = {
@@ -412,12 +481,13 @@ class SimplifiedOrderAgent:
             temperature=0.1
         )
         
-        # 5 tools cơ bản với tên chuẩn
+        # 6 tools cơ bản với tên chuẩn
         self.tools = [
             find_product_by_id, 
             find_product_by_name,
             get_user_info,
             get_user_orders,
+            collect_order_info,
             create_order_directly,
             update_order_info
         ]
@@ -463,7 +533,8 @@ class SimplifiedOrderAgent:
 🔍 Tìm sản phẩm theo tên: find_product_by_name(product_name)  
 👤 Lấy thông tin user: get_user_info(user_id)
 📋 Lấy lịch sử đơn hàng: get_user_orders(user_id, limit)
-🛍️ Tạo đơn hàng trực tiếp: create_order_directly(user_id, product_items, shipping_address, phone, payment_method)
+📝 Thu thập thông tin đặt hàng: collect_order_info(user_id, product_items)
+🛍️ Tạo đơn hàng với thông tin đầy đủ: create_order_directly(user_id, product_items, shipping_address, phone, payment_method)
 🔄 Cập nhật thông tin đơn hàng: update_order_info(order_id, shipping_address, phone, payment_method)
 
 📝 LƯU Ý QUAN TRỌNG:
@@ -490,25 +561,32 @@ class SimplifiedOrderAgent:
    - "5 đơn hàng gần nhất", "10 đơn cuối" → get_user_orders(1, số)
    - "đơn hàng user 5" → get_user_orders(5)
 
-4. 🛍️ TẠO ĐƠN HÀNG (FLOW MỚI - 3 BƯỚC):
-   BƯỚC 1: Hệ thống sẽ query thông tin sản phẩm trước
-   BƯỚC 2: Kiểm tra tồn kho và tính tiền
-   BƯỚC 3: Tạo đơn hàng sau khi validate
-   BƯỚC 4: Thực hiện confirm lại với user, nếu user cung cấp thông tin mới thì sẽ cập nhật lại thông tin shipping_address/phone
+4. 🛍️ TẠO ĐƠN HÀNG (FLOW MỚI - 2 BƯỚC BẮT BUỘC):
    
-   ⚠️ QUAN TRỌNG KHI XÁC NHẬN VỚI USER:
-   - KHÔNG BAO GIỜ hiển thị product_id, user_id, order_id trong thông tin xác nhận
-   - Thay vào đó sử dụng thông tin dễ hiểu: tên sản phẩm, tên khách hàng, số điện thoại
-   - Ví dụ ĐÚNG: "Bạn muốn đặt 2 chiếc iPhone 15 Pro Max giao đến 123 Nguyễn Trãi?"
-   - Ví dụ SAI: "Bạn muốn đặt 2 sản phẩm ID 5 cho user ID 1?"
+   ⚠️ **QUY TẮC QUAN TRỌNG:** MỌI ĐƠN HÀNG ĐỀU PHẢI HỎI THÔNG TIN ĐẦY ĐỦ!
    
-   Ví dụ:
-   - "đặt 2 sản phẩm ID 1 và 3 sản phẩm ID 5" → [{"product_id": 1, "quantity": 2}, {"product_id": 5, "quantity": 3}]
-   - "mua iPhone 2 cái" → Tìm iPhone trước, sau đó tạo đơn
-   - "giao đến 123 Nguyễn Trãi" → shipping_address = "123 Nguyễn Trãi"
-   - "số điện thoại 0901234567" → phone = "0901234567"
-   - "thanh toán chuyển khoản" → payment_method = "Bank Transfer"
-   - "COD", "tiền mặt" → payment_method = "COD"
+   BƯỚC 1: collect_order_info(user_id, product_items)
+   - Thu thập thông tin sản phẩm và hiển thị tổng tiền
+   - YÊU CẦU user cung cấp: địa chỉ, số điện thoại, hình thức thanh toán
+   - KHÔNG được tự động lấy từ thông tin user cũ
+   
+   BƯỚC 2: create_order_directly(user_id, product_items, shipping_address, phone, payment_method) 
+   - CHỈ gọi SAU KHI user đã cung cấp đầy đủ thông tin
+   - Tất cả thông tin đều BẮT BUỘC: shipping_address, phone, payment_method
+   - Hình thức thanh toán CHỈ chấp nhận: "COD" hoặc "Banking"
+   
+   ⚠️ QUAN TRỌNG:
+   - KHÔNG BAO GIỜ bỏ qua bước thu thập thông tin
+   - LUÔN hỏi đầy đủ: địa chỉ + số điện thoại + hình thức thanh toán
+   - KHÔNG sử dụng thông tin cũ từ profile user
+   - KHÔNG tự động đặt giá trị mặc định cho địa chỉ/phone
+   
+   Ví dụ flow đúng:
+   User: "đặt 2 sản phẩm ID 1"
+   → Gọi collect_order_info(1, '[{"product_id": 1, "quantity": 2}]')
+   → Hệ thống hỏi: địa chỉ, SĐT, hình thức thanh toán
+   User: "Giao 123 Nguyễn Trãi, SĐT 0901234567, thanh toán COD"
+   → Gọi create_order_directly(1, '[{"product_id": 1, "quantity": 2}]', "123 Nguyễn Trãi", "0901234567", "COD")
 
 5. 🔄 CẬP NHẬT ĐƠN HÀNG:
    - "cập nhật đơn 123", "sửa đơn hàng 456" → order_id = số
@@ -519,11 +597,14 @@ class SimplifiedOrderAgent:
 6. 📞 TRÍCH XUẤT THÔNG TIN LIÊN HỆ:
    - Số điện thoại: 09xx, 08xx, 07xx, 03xx, 05xx + 8 chữ số
    - Địa chỉ: "đến", "giao", "địa chỉ", "tại" + thông tin sau đó
-   - Phương thức thanh toán: "COD", "tiền mặt", "chuyển khoản", "thẻ tín dụng"
+   - Phương thức thanh toán CHỈ 2 LOẠI:
+     * "COD" (thanh toán khi nhận hàng, tiền mặt) 
+     * "Banking" (chuyển khoản ngân hàng)
 
-Ví dụ tạo đơn hàng:
-- product_items: '[{"product_id": 1, "quantity": 2}, {"product_id": 3, "quantity": 1}]'
-- Nếu không có shipping_address/phone, hệ thống sẽ tự động lấy từ thông tin user, và thực hiện confirm lại với user, nếu user cung cấp thông tin mới thì sẽ cập nhật lại thông tin shipping_address/phone
+Ví dụ trích xuất từ user message:
+- "Giao đến 123 Nguyễn Trãi, SĐT 0901234567, thanh toán COD"
+- "Địa chỉ 456 Lê Lợi, phone 0987654321, chuyển khoản" → Banking
+- "456 Trần Hưng Đạo, 0912345678, COD"
 
 HƯỚNG DẪN TRẢ LỜI:
 - Khi gọi tool, bạn có thể thêm text bổ sung thân thiện như "Tôi sẽ tìm sản phẩm cho bạn", "Đây là thông tin sản phẩm:", v.v.
@@ -633,6 +714,12 @@ HƯỚNG DẪN TRẢ LỜI:
                         count = 1
                         search_type = "order_updated"
                         operation_type = "update_order"
+                    elif data_type == "order_info_request":
+                        # Đây là bước thu thập thông tin, chưa tạo đơn hàng
+                        products = data_content.get("products_info", [])
+                        count = len(data_content.get("items", []))
+                        search_type = "order_info_request"
+                        operation_type = "collect_order_info"
         
         # Tạo formatted response theo chuẩn
         formatted_response = {

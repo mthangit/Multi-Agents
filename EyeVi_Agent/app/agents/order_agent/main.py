@@ -55,7 +55,7 @@ def main(host, port, agent_type):
         # Define agent capabilities - hỗ trợ streaming và push notifications
         capabilities = AgentCapabilities(streaming=False, pushNotifications=True)
         
-        # Agent skills - 5 chức năng chính từ SimplifiedOrderAgent
+        # Agent skills - 6 chức năng chính từ SimplifiedOrderAgent
         agent_skills = [
             AgentSkill(
                 id='find_product_by_id',
@@ -106,22 +106,34 @@ def main(host, port, agent_type):
                 ],
             ),
             AgentSkill(
-                id='create_order_directly',
-                name='Tạo đơn hàng trực tiếp',
-                description='Tạo đơn hàng mới với danh sách sản phẩm, địa chỉ giao hàng và phương thức thanh toán. Tự động kiểm tra tồn kho và tính tổng tiền.',
-                tags=['order', 'purchase', 'checkout', 'create', 'buy'],
+                id='collect_order_info',
+                name='Thu thập thông tin đặt hàng',
+                description='Thu thập và xác nhận thông tin sản phẩm, yêu cầu cung cấp địa chỉ giao hàng, số điện thoại và hình thức thanh toán (COD/Banking).',
+                tags=['order', 'info', 'collect', 'prepare', 'confirm'],
                 examples=[
-                    'Đặt 2 sản phẩm ID 1 và 3 sản phẩm ID 5',
-                    'Mua iPhone 2 cái giao đến 123 Nguyễn Trãi',
-                    'Tạo đơn hàng thanh toán COD',
-                    'Đặt hàng số điện thoại 0901234567'
+                    'Đặt 2 sản phẩm ID 1',
+                    'Mua iPhone 2 cái',
+                    'Tôi muốn đặt hàng',
+                    'Đặt 3 sản phẩm ID 5'
+                ],
+            ),
+            AgentSkill(
+                id='create_order_directly',
+                name='Tạo đơn hàng với thông tin đầy đủ',
+                description='Tạo đơn hàng cuối cùng với thông tin đầy đủ đã được thu thập (địa chỉ, SĐT, payment). Chỉ hỗ trợ COD và Banking.',
+                tags=['order', 'finalize', 'complete', 'create', 'confirm'],
+                examples=[
+                    'Xác nhận đặt hàng với địa chỉ và SĐT',
+                    'Hoàn tất đơn hàng thanh toán COD',
+                    'Tạo đơn với thông tin giao hàng',
+                    'Xử lý đơn hàng cuối cùng'
                 ],
             )
         ]
 
         # Create agent card với thông tin chi tiết
         agent_description = {
-            'simplified': 'Trợ lý quản lý đơn hàng thông minh với LangGraph và Gemini AI. Hỗ trợ tìm kiếm sản phẩm, quản lý thông tin khách hàng, xem lịch sử đơn hàng và tạo đơn hàng mới với kiểm tra tồn kho tự động.',
+            'simplified': 'Trợ lý quản lý đơn hàng thông minh với LangGraph và Gemini AI. Hỗ trợ tìm kiếm sản phẩm, quản lý thông tin khách hàng, xem lịch sử đơn hàng và tạo đơn hàng mới với thu thập thông tin đầy đủ (địa chỉ, SĐT, thanh toán COD/Banking).',
             'simple': 'Trợ lý đơn hàng với Simple LangGraph Agent',
             'streaming': 'Trợ lý đơn hàng với Streaming Bot'
         }
@@ -156,7 +168,7 @@ def main(host, port, agent_type):
         logger.info(f"   🤖 Agent Type: {agent_type.upper()}")
         logger.info(f"   📋 Agent Card: http://{host}:{port}/.well-known/agent.json")
         logger.info(f"   🔗 A2A Endpoint: http://{host}:{port}/")
-        logger.info(f"   ⚡ Capabilities: 5 skills, database integration")
+        logger.info(f"   ⚡ Capabilities: 6 skills, database integration")
         logger.info(f"   🧠 AI Model: Gemini 2.0 Flash")
         logger.info(f"💬 EyeVi Order Agent is ready!")
         

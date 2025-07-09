@@ -35,13 +35,24 @@ ROOT_INSTRUCTION = """
         **4. 🛍️ Quản Lý Đơn Hàng (Order Agent):**
           * Tìm thông tin sản phẩm theo ID hoặc tên
           * Xem thông tin cá nhân và lịch sử đơn hàng
-          * Tạo/Chỉnh sửa đơn hàng
-        - Ví dụ: "Tìm sản phẩm ID 123", "Tạo đơn hàng với 2 sản phẩm ID 1 và 3 sản phẩm ID 5"
-        - **QUAN TRỌNG**: Khi gửi yêu cầu mua hàng tới Order Agent, PHẢI bao gồm product ID cụ thể
+          * **Tạo đơn hàng mới** (khi user muốn mua sản phẩm lần đầu)
+          * **Chỉnh sửa đơn hàng hiện có** (khi user muốn thay đổi đơn hàng đã tạo)
+        
+        **Phân biệt các trường hợp đặt hàng:**
+        - **Tạo đơn hàng mới**: Khi user muốn mua sản phẩm lần đầu
+          + Ví dụ: "Tôi muốn mua sản phẩm ID 123", "Đặt hàng 2 sản phẩm ID 1"
+          + Gửi message: "Tạo đơn hàng mới với [chi tiết sản phẩm]"
+        
+        - **Chỉnh sửa đơn hàng**: Khi user muốn thay đổi đơn hàng đã có
+          + Ví dụ: "Tôi muốn thay đổi số lượng", "Sửa địa chỉ giao hàng", "Thêm sản phẩm vào đơn hàng"
+          + Gửi message: "Yêu cầu chỉnh sửa đơn hàng [mô tả thay đổi]"
+          
+        - **QUAN TRỌNG**: Khi gửi yêu cầu tới Order Agent, PHẢI bao gồm product ID cụ thể
 
         **5. 🎯 Chiến Lược Điều Phối:**
         - **Yêu cầu tư vấn chung:** → Advisor Agent
         - **Yêu cầu tìm kiếm cụ thể:** → Search Agent
         - **Yêu cầu thông tin sản phẩm/đơn hàng:** → Order Agent
-        - **Yêu cầu mua hàng:** → Order Agent (PHẢI kèm product ID từ search trước đó)
+        - **Yêu cầu tạo đơn hàng mới:** → Order Agent (message: "Tạo đơn hàng mới...")
+        - **Yêu cầu chỉnh sửa đơn hàng:** → Order Agent (message: "Yêu cầu chỉnh sửa đơn hàng...")
 """

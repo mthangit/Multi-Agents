@@ -122,13 +122,20 @@ class HostServer:
     "direct_response": "Response trực tiếp (nếu không cần agent nào khác)"
 }}}}
 
-**Hướng dẫn xử lý yêu cầu mua hàng:**
-- Các từ khóa mua hàng: "mua", "đặt hàng", "order", "thêm vào giỏ", "tôi cần", "tôi muốn lấy"
-- Khi phát hiện yêu cầu mua hàng:
+**Hướng dẫn xử lý yêu cầu đặt hàng:**
+- **Từ khóa tạo đơn hàng mới**: "mua", "đặt hàng", "order", "thêm vào giỏ", "tôi cần", "tôi muốn lấy" (khi chưa có đơn hàng)
+- **Từ khóa chỉnh sửa đơn hàng**: "sửa đơn hàng", "thay đổi", "chỉnh sửa", "cập nhật đơn hàng", "thêm vào đơn hàng hiện tại", "bỏ sản phẩm", "đổi địa chỉ", "đổi số lượng"
+
+**Khi phát hiện yêu cầu tạo đơn hàng mới:**
   1. Quét lại context để tìm các sản phẩm có ID (định dạng: "ID: xxx" hoặc "id: xxx")
   2. So khớp mô tả sản phẩm với yêu cầu của user
   3. Trích xuất chính xác product ID và đính kèm vào message_to_agent
-  4. Format: "Tôi muốn mua [tên sản phẩm] với ID: [ID]"
+  4. Format: "Tạo đơn hàng mới với [tên sản phẩm] ID: [ID]"
+
+**Khi phát hiện yêu cầu chỉnh sửa đơn hàng:**
+  1. Xác định đơn hàng nào cần chỉnh sửa từ context
+  2. Trích xuất product ID nếu có sản phẩm mới cần thêm
+  3. Format: "Yêu cầu chỉnh sửa đơn hàng [mô tả thay đổi cụ thể]"
 
 **Hướng dẫn làm rõ message:**
 - Nếu user nói "sản phẩm đó", "cái này", "nó" → thay bằng tên cụ thể từ context
@@ -185,13 +192,20 @@ class HostServer:
 - Đảm bảo agent có thể hiểu hoàn toàn request mà không cần đọc thêm context gì khác
 - Format ví dụ: "Tôi muốn mua sản phẩm ABC với ID: 123. Trước đó tôi đã tìm hiểu về sản phẩm này với giá 500k và đã xem các thông tin chi tiết..."
 
-**Hướng dẫn xử lý yêu cầu mua hàng:**
-- Các từ khóa mua hàng: "mua", "đặt hàng", "order", "thêm vào giỏ", "tôi cần", "tôi muốn lấy"
-- Khi phát hiện yêu cầu mua hàng:
+**Hướng dẫn xử lý yêu cầu đặt hàng:**
+- **Từ khóa tạo đơn hàng mới**: "mua", "đặt hàng", "order", "thêm vào giỏ", "tôi cần", "tôi muốn lấy" (khi user chưa có đơn hàng hiện tại)
+- **Từ khóa chỉnh sửa đơn hàng**: "sửa đơn hàng", "thay đổi đơn hàng", "chỉnh sửa", "cập nhật đơn hàng", "thêm vào đơn hàng hiện tại", "bỏ sản phẩm", "đổi địa chỉ", "đổi số lượng"
+
+**Khi phát hiện yêu cầu tạo đơn hàng mới:**
   1. Quét lại context để tìm các sản phẩm có ID (định dạng: "ID: xxx" hoặc "id: xxx")
   2. So khớp mô tả sản phẩm với yêu cầu của user
   3. Trích xuất chính xác product ID và đính kèm vào message_to_agent
-  4. Format: "Tôi muốn mua [tên sản phẩm] với ID: [ID] + context về sản phẩm này"
+  4. Format: "Tạo đơn hàng mới với [tên sản phẩm] ID: [ID] + context về sản phẩm này"
+
+**Khi phát hiện yêu cầu chỉnh sửa đơn hàng:**
+  1. Xác định đơn hàng nào cần chỉnh sửa từ context hoặc lịch sử
+  2. Trích xuất product ID nếu có sản phẩm mới cần thêm
+  3. Format: "Yêu cầu chỉnh sửa đơn hàng [mô tả chi tiết thay đổi] + context về đơn hàng hiện tại"
 
 **Hướng dẫn làm rõ message:**
 - Nếu user nói "sản phẩm đó", "cái này", "nó" → thay bằng tên cụ thể từ context
@@ -202,7 +216,9 @@ class HostServer:
 
 **Lưu ý quan trọng:**
 - **message_to_agent phải là message hoàn chỉnh tự đủ**, agent không cần đọc thêm context nào khác
-- **ĐẶC BIỆT QUAN TRỌNG**: Nếu là yêu cầu mua hàng, message_to_agent PHẢI chứa product ID
+- **ĐẶC BIỆT QUAN TRỌNG**: 
+  + Nếu là yêu cầu **tạo đơn hàng mới**, message_to_agent phải bắt đầu bằng "Tạo đơn hàng mới..." và PHẢI chứa product ID
+  + Nếu là yêu cầu **chỉnh sửa đơn hàng**, message_to_agent phải bắt đầu bằng "Yêu cầu chỉnh sửa đơn hàng..." và mô tả rõ thay đổi
 - Context summary phải ngắn gọn nhưng đầy đủ thông tin cần thiết
 - Tích hợp context một cách tự nhiên, không làm message trở nên rườm rà
 

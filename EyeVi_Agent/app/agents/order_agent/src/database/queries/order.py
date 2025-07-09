@@ -69,13 +69,13 @@ class OrderQuery:
             
             actual_price = total_price  # Có thể áp dụng giảm giá sau
             
-            # 4. Tạo đơn hàng mới với thông tin user
+            # 4. Tạo đơn hàng mới với thông tin user và payment
             cursor.execute(
                 """
-                INSERT INTO orders (user_id, total_items, total_price, actual_price, shipping_address, phone, order_status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO orders (user_id, total_items, total_price, actual_price, shipping_address, phone, payment, order_status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
                 """,
-                (user_id, total_items, total_price, actual_price, final_shipping_address, final_phone, 'pending')
+                (user_id, total_items, total_price, actual_price, final_shipping_address, final_phone, payment_method, 'pending')
             )
             order_id = cursor.lastrowid
             
@@ -108,7 +108,7 @@ class OrderQuery:
         """Lấy thông tin đơn hàng và chi tiết đơn hàng theo ID"""
         cursor = self.db.cursor(dictionary=True)
         
-        # Lấy thông tin đơn hàng
+        # Lấy thông tin đơn hàng bao gồm cột payment
         cursor.execute(
             """
             SELECT o.*, u.name as user_name, u.email as user_email
@@ -164,6 +164,57 @@ class OrderQuery:
         orders = cursor.fetchall()
         cursor.close()
         return orders
+    
+    def update_order(self, order_id: int, shipping_address: str = None, phone: str = None, payment_method: str = None) -> bool:
+        """
+        Cập nhật thông tin đơn hàng
+        Args:
+            order_id: ID đơn hàng cần cập nhật
+            shipping_address: Địa chỉ giao hàng mới (tùy chọn)
+            phone: Số điện thoại mới (tùy chọn) 
+            payment_method: Phương thức thanh toán mới (tùy chọn)
+        Returns:
+            bool: True nếu cập nhật thành công, False nếu thất bại
+        """
+        cursor = self.db.cursor()
+        try:
+            # Xây dựng câu query UPDATE động
+            update_fields = []
+            update_values = []
+            
+            if shipping_address is not None:
+                update_fields.append("shipping_address = %s")
+                update_values.append(shipping_address)
+            
+            if phone is not None:
+                update_fields.append("phone = %s")
+                update_values.append(phone)
+                
+            if payment_method is not None:
+                update_fields.append("payment = %s")
+                update_values.append(payment_method)
+            
+            if not update_fields:
+                return False  # Không có gì để cập nhật
+            
+            update_values.append(order_id)  # Thêm order_id vào cuối cho WHERE clause
+            
+            query = f"""
+                UPDATE orders 
+                SET {', '.join(update_fields)}
+                WHERE id = %s
+            """
+            
+            cursor.execute(query, update_values)
+            self.db.commit()
+            
+            return cursor.rowcount > 0  # Trả về True nếu có ít nhất 1 row được cập nhật
+            
+        except Exception as e:
+            self.db.rollback()
+            raise e
+        finally:
+            cursor.close()
     
     def check_stock(self, product_id: int) -> Optional[Dict]:
         """Kiểm tra tồn kho của sản phẩm"""
