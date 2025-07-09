@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useImperativeHandle, forwardRef } from "react";
+import React, { useState, useRef, useImperativeHandle, forwardRef, useEffect } from "react";
 import { Send, Paperclip, ImageIcon } from "lucide-react";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
@@ -95,6 +95,14 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
     setAttachments(prev => prev.filter((_, i) => i !== index));
   };
 
+  // Cleanup object URLs khi component unmount
+  useEffect(() => {
+    return () => {
+      // Chỉ cleanup khi component unmount, không cleanup khi attachments thay đổi
+      // vì object URLs cần được giữ để hiển thị trong chat
+    };
+  }, []);
+
   return (
     <div className="border-t border-border p-4">
       <form onSubmit={handleSubmit} className="flex flex-col space-y-4">
@@ -142,13 +150,24 @@ const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(({ onSendMessage, isL
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-2">
             {attachments.map((file, index) => (
-              <div key={index} className="flex items-center bg-muted p-2 rounded-md">
-                <span className="text-sm truncate max-w-[150px]">{file.name}</span>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  size="sm" 
-                  className="ml-1 h-5 w-5" 
+              <div key={index} className="relative bg-muted p-2 rounded-md">
+                {file.type.startsWith("image/") ? (
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={URL.createObjectURL(file)}
+                      alt={file.name}
+                      className="w-12 h-12 object-cover rounded"
+                    />
+                    <span className="text-sm truncate max-w-[100px]">{file.name}</span>
+                  </div>
+                ) : (
+                  <span className="text-sm truncate max-w-[150px]">{file.name}</span>
+                )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="ml-1 h-5 w-5"
                   onClick={() => removeAttachment(index)}
                   disabled={isLoading}
                 >

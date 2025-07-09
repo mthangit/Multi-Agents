@@ -150,11 +150,11 @@ const Sidebar = ({ sessionId, onNewChat, onClearHistory, onLoadHistory }: Sideba
             }
           }}
         />
-        <FooterItem 
+        {/* <FooterItem 
           icon={<Trash2 size={16} />} 
           text="Xóa lịch sử" 
           onClick={handleClearHistory}
-        />
+        /> */}
       </div>
     </div>
   );

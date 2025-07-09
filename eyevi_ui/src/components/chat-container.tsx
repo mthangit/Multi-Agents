@@ -34,6 +34,7 @@ interface ContainerMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: string;
+  attachments?: Array<{name: string; url: string; type: string}>;
   products?: ProductData[];
   extracted_product_ids?: string[];
   orders?: OrderData[];
@@ -108,6 +109,21 @@ const ChatContainer = forwardRef<ChatContainerRef>((_, ref) => {
       previousSessionIdRef.current = sessionId;
     }
   }, [sessionId, isViewingHistory]);
+
+  // Cleanup object URLs khi component unmount (không cleanup khi messages thay đổi)
+  useEffect(() => {
+    return () => {
+      messages.forEach(msg => {
+        if (msg.attachments) {
+          msg.attachments.forEach(attachment => {
+            if (attachment.url.startsWith('blob:')) {
+              URL.revokeObjectURL(attachment.url);
+            }
+          });
+        }
+      });
+    };
+  }, []); // Chỉ cleanup khi component unmount
 
   // Khởi tạo tin nhắn chào mừng khi có sessionId và messages rỗng
   useEffect(() => {
@@ -237,14 +253,22 @@ const ChatContainer = forwardRef<ChatContainerRef>((_, ref) => {
   }, [loadingMessageId, loadingStepIndex]);
 
   const handleSendMessage = async (message: string, attachments?: File[]) => {
+    // Tạo attachment URLs cho preview
+    const attachmentData = attachments?.map(file => ({
+      name: file.name,
+      url: URL.createObjectURL(file),
+      type: file.type
+    })) || [];
+
     // Thêm tin nhắn của người dùng vào danh sách
     const userMessage: ContainerMessage = {
       id: messages.length + 1,
       role: "user",
       content: message,
       timestamp: new Date().toISOString(),
+      attachments: attachmentData,
     };
-    
+
     setMessages((prev) => [...prev, userMessage]);
     
     // Thêm tin nhắn loading
@@ -321,13 +345,13 @@ const ChatContainer = forwardRef<ChatContainerRef>((_, ref) => {
       if (msg.extracted_product_ids) {
         console.log("Found extracted_product_ids:", msg.extracted_product_ids);
       }
-      
+
       return {
         id: msg.id.toString(),
         content: msg.content,
         sender: msg.role === "user" ? "user" : "bot",
         timestamp: new Date(msg.timestamp),
-        attachments: [],
+        attachments: msg.attachments || [],
         products: msg.products,
         extracted_product_ids: msg.extracted_product_ids,
         orders: msg.orders,

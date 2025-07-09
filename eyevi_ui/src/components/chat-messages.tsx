@@ -7,6 +7,7 @@ import Image from "next/image";
 import { ProductData, OrderData } from "@/hooks/useChatApi";
 import ProductList from "./product-list";
 import OrderList from "./order-list";
+import MarkdownRenderer from "./markdown-renderer";
 
 interface Attachment {
   name: string;
@@ -119,7 +120,14 @@ const ChatMessages = ({ messages }: ChatMessagesProps) => {
                   </div>
                 </div>
               ) : (
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                <MarkdownRenderer
+                  content={message.content}
+                  className={cn(
+                    message.sender === "user"
+                      ? "text-primary-foreground [&_*]:text-primary-foreground"
+                      : "text-foreground"
+                  )}
+                />
               )}
             </div>
             
