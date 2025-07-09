@@ -5,8 +5,6 @@ import {
   AddressCard,
   AddressForm,
 } from "../components";
-import OrderList from "../components/orders/OrderList";
-import OrderDetails from "../components/orders/OrderDetails";
 import Address from "../components/address/Address";
 import { useNavigate } from "react-router-dom";
 
@@ -22,22 +20,13 @@ const Profile = () => {
   const [loggingOut, setLoggingOut] = useState(false);
 
   const { logoutHandler, userInfo, token } = useAuthContext();
-  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
-  const handleSelectOrder = (orderId) => {
-    setSelectedItem("order");
-    setSelectedOrderId(orderId);
-  };
   const handleLogOut = () => {
     setLoggingOut(true);
     setTimeout(() => {
       logoutHandler();
       setLoggingOut(false);
     }, 1000);
-  };
-
-  const handleGoBack = () => {
-    setSelectedOrderId(null);
   };
 
   return (
@@ -65,27 +54,14 @@ const Profile = () => {
             Địa chỉ
           </button>
           <button
-            onClick={() => setSelectedItem("order")}
-            className={`text-sm mb-3 ${
-              selectedItem === "order"
-                ? "bg-[--primary-text-color] text-white"
-                : "bg-gray-100"
-            } p-5 shadow-sm transition-colors w-full text-left`}
+            onClick={() => navigate("/orders")}
+            className={`text-sm mb-3 bg-gray-100 p-5 shadow-sm transition-colors w-full text-left hover:bg-gray-200`}
           >
             Đơn hàng
           </button>
         </div>
         <div className="flex-1 ml-4">
-          {selectedItem === "order" ? (
-            selectedOrderId ? (
-              <OrderDetails
-                orderId={selectedOrderId}
-                onGoBack={handleGoBack}
-              />
-            ) : (
-              <OrderList onSelectOrder={handleSelectOrder} userId={userDetails?.id || 1} />
-            )
-          ) : selectedItem === "profile" ? (
+          {selectedItem === "profile" ? (
             <div className="flex flex-col gap-4 w-full p-5">
               <p>
                 <span className="text-gray-600 me-1">Username:</span>

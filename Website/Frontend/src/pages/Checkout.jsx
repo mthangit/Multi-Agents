@@ -43,7 +43,7 @@ const Checkout = () => {
       } else {
         clearCart();
         notify("info", "Đơn hàng của bạn đã được đặt thành công!");
-        navigate("/orders", { state: "orderSuccess" });
+        navigate("/order-success", { state: "orderSuccess" });
       }
     } catch (err) {
       console.error("Error placing order:", err.message);

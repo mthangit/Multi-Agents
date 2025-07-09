@@ -9,7 +9,9 @@ import {
   Wishlist, 
   Checkout, 
   Profile, 
-  Orders 
+  Orders,
+  OrderDetail,
+  OrderSuccess
 } from "../pages";
 import { PaymentResult } from "../components";
 
@@ -53,6 +55,14 @@ const contentRoutes = [
   {
     path: "/orders",
     element: <Orders />,
+  },
+  {
+    path: "/order/:orderId",
+    element: <OrderDetail />,
+  },
+  {
+    path: "/order-success",
+    element: <OrderSuccess />,
   },
   {
     path: "/profile",

@@ -1,34 +1,30 @@
-import React, { useEffect } from "react";
-import orderSuccess from "../assets/success-order.gif";
-import { useLocation, useNavigate } from "react-router";
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import OrderList from "../components/orders/OrderList";
 
 const Orders = () => {
-  const location = useLocation();
   const navigate = useNavigate();
-  useEffect(() => {
-    if (location?.state !== "orderSuccess") {
-      navigate("/");
-    } else {
-      setTimeout(() => {
-        navigate("/products");
-      }, 3000);
-    }
-  }, []);
+  
+  // Lấy thông tin user từ localStorage
+  const userDetails = localStorage.getItem("userInfo")
+    ? JSON.parse(localStorage.getItem("userInfo"))
+    : null;
+
+  const handleSelectOrder = (orderId) => {
+    navigate(`/order/${orderId}`);
+  };
+
   return (
-    <div className="min-h-[80vh] flex justify-center items-center py-3 ">
-      <div className="bg-white h-1/2 w-96 m-auto  rounded-md flex flex-col items-center justify-center p-5 modalShadow">
-        <div className=" w-64  flex items-center justify-center ">
-          <img
-            src={orderSuccess}
-            alt="order-successfull"
-            className="w-full object-fit"
-          />
-        </div>
-        <p className="text-3xl py-2 font-semibold text-gray-700">
-          Đặt hàng thành công
-        </p>
-        <p className="text-sm text-gray-400">Cảm ơn vì đã mua hàng :)</p>
+    <div className="min-h-[80vh] max-w-6xl mx-auto px-4 py-8">
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Đơn hàng của tôi</h1>
+        <p className="text-gray-600">Xem và theo dõi tất cả đơn hàng của bạn</p>
       </div>
+      
+      <OrderList 
+        onSelectOrder={handleSelectOrder} 
+        userId={userDetails?.id || 1} 
+      />
     </div>
   );
 };

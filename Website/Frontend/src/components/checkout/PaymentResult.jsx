@@ -32,9 +32,9 @@ function PaymentResult() {
     if (paymentStatus === "success") {
       clearCart();
       notify("info", "Đơn hàng của bạn đã được đặt thành công!");
-      navigate("/orders", { state: "orderSuccess" });
+      navigate("/order-success", { state: "orderSuccess" });
     } else if (paymentStatus === "failed") {
-      navigate("/orders", { state: "orderNotSuccess" });
+      navigate("/order-success", { state: "orderNotSuccess" });
     }
   }, [paymentStatus, navigate]);
 

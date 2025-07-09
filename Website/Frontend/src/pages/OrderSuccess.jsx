@@ -1,0 +1,39 @@
+import React, { useEffect } from "react";
+import orderSuccess from "../assets/success-order.gif";
+import { useLocation, useNavigate } from "react-router-dom";
+
+const OrderSuccess = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    if (location?.state !== "orderSuccess") {
+      navigate("/");
+    } else {
+      setTimeout(() => {
+        navigate("/orders");
+      }, 3000);
+    }
+  }, [location?.state, navigate]);
+
+  return (
+    <div className="min-h-[80vh] flex justify-center items-center py-3 ">
+      <div className="bg-white h-1/2 w-96 m-auto  rounded-md flex flex-col items-center justify-center p-5 modalShadow">
+        <div className=" w-64  flex items-center justify-center ">
+          <img
+            src={orderSuccess}
+            alt="order-successfull"
+            className="w-full object-fit"
+          />
+        </div>
+        <p className="text-3xl py-2 font-semibold text-gray-700">
+          Đặt hàng thành công
+        </p>
+        <p className="text-sm text-gray-400">Cảm ơn vì đã mua hàng :)</p>
+        <p className="text-xs text-gray-400 mt-2">Chuyển đến trang đơn hàng trong 3s...</p>
+      </div>
+    </div>
+  );
+};
+
+export default OrderSuccess; 

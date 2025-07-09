@@ -12,5 +12,7 @@ export { default as Profile } from "./Profile";
 
 export { default as Checkout } from "./Checkout";
 export { default as Orders } from "./Orders";
+export { default as OrderDetail } from "./OrderDetail";
+export { default as OrderSuccess } from "./OrderSuccess";
 
 export { default as ErrorPage } from "./ErrorPage";
